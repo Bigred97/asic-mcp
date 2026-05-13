@@ -1,0 +1,131 @@
+id: ASIC_AFS_AUTH_REP
+name: ASIC AFS Authorised Representative Register
+description: |
+  Every authorised representative of an AFS licensee — individuals and entities
+  that provide financial services under the cover of a licensee's AFSL. The
+  bigger of the two AFS registers (~50 MB CSV) since each rep can be appointed
+  by multiple licensees and across multiple endorsement classes. Use this to
+  find who is authorised to act for a specific AFSL, or to confirm an
+  individual rep's appointment status.
+
+  Source: ASIC AFS Authorised Representative Dataset, distributed via
+  data.gov.au under Creative Commons Attribution 3.0 Australia (CC BY 3.0 AU).
+period_coverage: current snapshot (weekly)
+update_frequency: weekly
+source_url: https://data.gov.au/data/dataset/asic-afs-authorised-representative
+download_url: https://data.gov.au/data/dataset/a7bbbf64-e2ef-4d96-9fb4-0aea73ada2af/resource/5515dfcc-5266-44df-950d-7e359a83d514/download/afs_rep_202605.csv
+discovery:
+  package_id: asic-afs-authorised-representative
+  resource_name: AFS Authorised Representative Dataset - Current
+format: csv
+header_row: 1
+layout: wide
+cache_kind: register
+search_keywords:
+  - afs authorised representative
+  - afs rep
+  - afsl rep
+  - corporate authorised representative
+  - car
+  - representative number
+  - who acts under afsl
+  - financial services rep
+columns:
+  register_name:
+    source_column: REGISTER_NAME
+    description: Always "AFS Representative". Constant.
+    role: dimension
+    dtype: string
+  rep_number:
+    source_column: AFS_REP_NUM
+    description: ASIC-assigned authorised representative number.
+    role: id
+    dtype: string
+  licence_number:
+    source_column: AFS_LIC_NUM
+    description: AFS licence number of the appointing licensee.
+    role: dimension
+    dtype: string
+  rep_name:
+    source_column: AFS_REP_NAME
+    description: Legal name of the authorised representative (person or entity).
+    role: dimension
+    dtype: string
+  rep_abn:
+    source_column: AFS_REP_ABN
+    description: ABN of the authorised representative, when supplied.
+    role: dimension
+    dtype: string
+  rep_acn:
+    source_column: AFS_REP_ACN
+    description: ACN of the authorised representative, when an Australian company.
+    role: dimension
+    dtype: string
+  rep_other_role:
+    source_column: AFS_REP_OTHER_ROLE
+    description: Other roles concurrently held by the representative.
+    role: dimension
+    dtype: string
+  rep_start_date:
+    source_column: AFS_REP_START_DT
+    description: Date the appointment started (DD/MM/YYYY).
+    role: dimension
+    dtype: string
+  rep_status:
+    source_column: AFS_REP_STATUS
+    description: Status of the appointment — "Current" or "Ceased".
+    role: dimension
+    dtype: string
+  rep_end_date:
+    source_column: AFS_REP_END_DT
+    description: Date the appointment ended (DD/MM/YYYY); blank if current.
+    role: dimension
+    dtype: string
+  locality:
+    source_column: AFS_REP_ADD_LOCAL
+    description: Suburb/town of the rep's registered address.
+    role: dimension
+    dtype: string
+  state:
+    source_column: AFS_REP_ADD_STATE
+    description: State or territory (NSW/VIC/QLD/SA/WA/TAS/NT/ACT).
+    role: dimension
+    dtype: string
+  postcode:
+    source_column: AFS_REP_ADD_PCODE
+    description: Postcode of the rep's registered address.
+    role: dimension
+    dtype: string
+  country:
+    source_column: AFS_REP_ADD_COUNTRY
+    description: Country of the registered address.
+    role: dimension
+    dtype: string
+  appointed_by:
+    source_column: AFS_REP_APPOINTED_BY
+    description: AFS licence number of the appointing licensee.
+    role: dimension
+    dtype: string
+dimension_values:
+  state:
+    nsw: NSW
+    vic: VIC
+    qld: QLD
+    sa: SA
+    wa: WA
+    tas: TAS
+    nt: NT
+    act: ACT
+    NSW: NSW
+    VIC: VIC
+    QLD: QLD
+    SA: SA
+    WA: WA
+    TAS: TAS
+    NT: NT
+    ACT: ACT
+  rep_status:
+    current: Current
+    ceased: Ceased
+    Current: Current
+    Ceased: Ceased

@@ -1,0 +1,138 @@
+id: ASIC_CREDIT_LICENSEE
+name: ASIC Australian Credit Licensee Register
+description: |
+  Every Australian Credit Licensee — entities authorised under the National
+  Consumer Credit Protection Act 2009 to engage in credit activities (lenders,
+  brokers, finance providers). Maintained by ASIC and updated weekly via
+  data.gov.au. Use this to confirm whether a firm is licensed to provide or
+  broker consumer credit, look up authorisations, or find licensees in a
+  region.
+
+  Source: ASIC Credit Licensee Dataset, distributed via data.gov.au under
+  Creative Commons Attribution 3.0 Australia (CC BY 3.0 AU).
+period_coverage: current snapshot (weekly)
+update_frequency: weekly
+source_url: https://data.gov.au/data/dataset/asic-credit-licensee
+download_url: https://data.gov.au/data/dataset/fa0b0d71-b8b8-4af8-bc59-0b000ce0d5e4/resource/35953a01-a9a8-4609-8566-c9fa7de465d3/download/credit_lic_202605.csv
+discovery:
+  package_id: asic-credit-licensee
+  resource_name: Credit Licence Dataset - Current
+format: csv
+header_row: 1
+layout: wide
+cache_kind: register
+search_keywords:
+  - credit licensee
+  - australian credit licence
+  - acl
+  - nccp
+  - consumer credit
+  - mortgage broker licence
+  - finance broker
+  - lender licence
+  - buy now pay later licence
+  - bnpl licensee
+  - credit provider
+columns:
+  register_name:
+    source_column: REGISTER_NAME
+    description: Always "Credit Licence". Constant.
+    role: dimension
+    dtype: string
+  licence_number:
+    source_column: CRED_LIC_NUM
+    description: Australian Credit Licence number, 6 digits including leading zeros.
+    role: id
+    dtype: string
+  licensee_name:
+    source_column: CRED_LIC_NAME
+    description: Legal name of the credit licensee. Substring match supported.
+    role: dimension
+    dtype: string
+  start_date:
+    source_column: CRED_LIC_START_DT
+    description: Date the credit licence was issued (DD/MM/YYYY).
+    role: dimension
+    dtype: string
+  end_date:
+    source_column: CRED_LIC_END_DT
+    description: Date the credit licence was cancelled or expired (DD/MM/YYYY); blank if active.
+    role: dimension
+    dtype: string
+  current_status:
+    source_column: CRED_LIC_STATUS
+    description: Current status code (e.g. "APPR" = approved/current, "CANC" = cancelled, "SUSP" = suspended).
+    role: dimension
+    dtype: string
+  abn_acn:
+    source_column: CRED_LIC_ABN_ACN
+    description: ABN or ACN of the credit licensee.
+    role: dimension
+    dtype: string
+  afsl_number:
+    source_column: CRED_LIC_AFSL_NUM
+    description: AFS licence number, when the licensee also holds an AFSL.
+    role: dimension
+    dtype: string
+  status_history:
+    source_column: CRED_LIC_STATUS_HISTORY
+    description: Historical sequence of status events on this licence.
+    role: dimension
+    dtype: string
+  locality:
+    source_column: CRED_LIC_LOCALITY
+    description: Suburb/town of the licensee's registered address.
+    role: dimension
+    dtype: string
+  state:
+    source_column: CRED_LIC_STATE
+    description: State or territory (NSW/VIC/QLD/SA/WA/TAS/NT/ACT).
+    role: dimension
+    dtype: string
+  postcode:
+    source_column: CRED_LIC_PCODE
+    description: Postcode of the registered address.
+    role: dimension
+    dtype: string
+  edrs:
+    source_column: CRED_LIC_EDRS
+    description: External Dispute Resolution scheme membership (e.g. "AFCA").
+    role: dimension
+    dtype: string
+  business_name:
+    source_column: CRED_LIC_BN
+    description: Registered business name(s) under which the licensee trades.
+    role: dimension
+    dtype: string
+  authorisations:
+    source_column: CRED_LIC_AUTHORISATIONS
+    description: Free-text description of the activities the licence authorises.
+    role: dimension
+    dtype: string
+dimension_values:
+  state:
+    nsw: NSW
+    vic: VIC
+    qld: QLD
+    sa: SA
+    wa: WA
+    tas: TAS
+    nt: NT
+    act: ACT
+    NSW: NSW
+    VIC: VIC
+    QLD: QLD
+    SA: SA
+    WA: WA
+    TAS: TAS
+    NT: NT
+    ACT: ACT
+  current_status:
+    approved: APPR
+    current: APPR
+    active: APPR
+    cancelled: CANC
+    suspended: SUSP
+    APPR: APPR
+    CANC: CANC
+    SUSP: SUSP

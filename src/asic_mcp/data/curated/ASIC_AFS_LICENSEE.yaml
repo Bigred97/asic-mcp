@@ -1,0 +1,120 @@
+id: ASIC_AFS_LICENSEE
+name: ASIC Australian Financial Services Licensee Register
+description: |
+  Every Australian Financial Services (AFS) licensee currently or historically
+  authorised by ASIC. ~6,500 entities — banks, brokers, fund managers,
+  insurance dealers, advisory firms. Use this to confirm whether a firm holds
+  an AFSL, find all licensees in a state, or look up the authorisation
+  conditions attached to a specific AFSL number.
+
+  Source: ASIC AFS Licensee Dataset, distributed via data.gov.au under
+  Creative Commons Attribution 3.0 Australia (CC BY 3.0 AU).
+period_coverage: current snapshot (weekly)
+update_frequency: weekly
+source_url: https://data.gov.au/data/dataset/asic-afs-licensee
+download_url: https://data.gov.au/data/dataset/ab7eddce-84df-4098-bc8f-500d0d9776d1/resource/d98a113d-6b50-40e6-b65f-2612efc877f4/download/afs_lic_202605.csv
+discovery:
+  package_id: asic-afs-licensee
+  resource_name: AFS Licensee Dataset - Current
+format: csv
+header_row: 1
+layout: wide
+cache_kind: register
+search_keywords:
+  - afs licensee
+  - afsl
+  - australian financial services licence
+  - financial services licensee
+  - holds an afsl
+  - find afsl
+  - westpac afsl
+  - macquarie afsl
+  - cba afsl
+  - investment adviser firm
+  - fund manager licence
+  - stockbroker
+  - broker licence
+columns:
+  register_name:
+    source_column: REGISTER_NAME
+    description: Always "AFS Licence". Constant.
+    role: dimension
+    dtype: string
+  licence_number:
+    source_column: AFS_LIC_NUM
+    description: AFS licence number, 6-7 digits including leading zeros.
+    role: id
+    dtype: string
+  licensee_name:
+    source_column: AFS_LIC_NAME
+    description: Legal name of the licensee. Substring match is supported.
+    role: dimension
+    dtype: string
+  abn_acn:
+    source_column: AFS_LIC_ABN_ACN
+    description: ABN or ACN of the licensee.
+    role: dimension
+    dtype: string
+  start_date:
+    source_column: AFS_LIC_START_DT
+    description: Date the AFS licence was issued (DD/MM/YYYY).
+    role: dimension
+    dtype: string
+  pre_fsr:
+    source_column: AFS_LIC_PRE_FSR
+    description: Marker of pre-FSR (Financial Services Reform Act) authorisation status, when applicable.
+    role: dimension
+    dtype: string
+  locality:
+    source_column: AFS_LIC_ADD_LOCAL
+    description: Suburb/town of the licensee's registered address.
+    role: dimension
+    dtype: string
+  state:
+    source_column: AFS_LIC_ADD_STATE
+    description: State or territory of the registered address (NSW/VIC/QLD/SA/WA/TAS/NT/ACT).
+    role: dimension
+    dtype: string
+  postcode:
+    source_column: AFS_LIC_ADD_PCODE
+    description: Postcode of the registered address.
+    role: dimension
+    dtype: string
+  country:
+    source_column: AFS_LIC_ADD_COUNTRY
+    description: Country of the registered address (overwhelmingly Australia).
+    role: dimension
+    dtype: string
+  latitude:
+    source_column: AFS_LIC_LAT
+    description: Latitude of the registered address, when geocoded.
+    role: dimension
+    dtype: string
+  longitude:
+    source_column: AFS_LIC_LNG
+    description: Longitude of the registered address, when geocoded.
+    role: dimension
+    dtype: string
+  authorisation:
+    source_column: AFS_LIC_CONDITION
+    description: Free-text authorisation conditions describing what financial services and products the licensee may deal in.
+    role: dimension
+    dtype: string
+dimension_values:
+  state:
+    nsw: NSW
+    vic: VIC
+    qld: QLD
+    sa: SA
+    wa: WA
+    tas: TAS
+    nt: NT
+    act: ACT
+    NSW: NSW
+    VIC: VIC
+    QLD: QLD
+    SA: SA
+    WA: WA
+    TAS: TAS
+    NT: NT
+    ACT: ACT

@@ -1,0 +1,33 @@
+{
+  "_comment": "Drop this into ~/Library/Application Support/Claude/claude_desktop_config.json (macOS) or %APPDATA%/Claude/claude_desktop_config.json (Windows) — or merge the mcpServers block into your existing config. Restart Claude Desktop after editing.",
+  "mcpServers": {
+    "abs": {
+      "command": "uvx",
+      "args": ["--upgrade", "abs-mcp"]
+    },
+    "rba": {
+      "command": "uvx",
+      "args": ["--upgrade", "rba-mcp"]
+    },
+    "ato": {
+      "command": "uvx",
+      "args": ["--upgrade", "ato-mcp"]
+    },
+    "apra": {
+      "command": "uvx",
+      "args": ["--upgrade", "apra-mcp"]
+    },
+    "aihw": {
+      "command": "uvx",
+      "args": ["--upgrade", "aihw-mcp"]
+    },
+    "asic": {
+      "command": "uvx",
+      "args": ["--upgrade", "asic-mcp"]
+    },
+    "au-weather": {
+      "command": "uvx",
+      "args": ["--upgrade", "au-weather-mcp"]
+    }
+  }
+}

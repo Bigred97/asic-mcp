@@ -1,0 +1,109 @@
+id: ASIC_BANNED_PERSONS
+name: ASIC Banned and Disqualified Persons Register
+description: |
+  Every individual ASIC has banned, disqualified, or excluded from providing
+  financial services, credit activities, or managing corporations. Updated
+  weekly. Common consumer-protection lookup — "has this person been banned
+  by ASIC?", or "what bans were issued in 2024?". Includes the banning order
+  type, the start and end dates of the ban, and the public comment ASIC
+  recorded at the time.
+
+  Source: ASIC Banned and Disqualified Persons Dataset, distributed via
+  data.gov.au under Creative Commons Attribution 3.0 Australia (CC BY 3.0 AU).
+period_coverage: current snapshot (weekly)
+update_frequency: weekly
+source_url: https://data.gov.au/data/dataset/asic-banned-disqualified-per
+download_url: https://data.gov.au/data/dataset/e08a07dc-e1e7-4ab9-95c0-a7930d2f6a39/resource/741da9e3-7e0c-458e-830c-c518698e1788/download/bd_per_202605.csv
+discovery:
+  package_id: asic-banned-disqualified-per
+  resource_name: Banned and Disqualified Persons - Current
+format: csv
+header_row: 1
+layout: wide
+cache_kind: register
+search_keywords:
+  - banned person
+  - disqualified
+  - banning order
+  - banned by asic
+  - is this person banned
+  - banned financial adviser
+  - banned credit
+  - disqualified director
+  - enforcement
+  - asic enforcement
+  - prohibited person
+columns:
+  register_name:
+    source_column: REGISTER_NAME
+    description: Always "Banned and Disqualified Persons". Constant.
+    role: dimension
+    dtype: string
+  person_name:
+    source_column: BD_PER_NAME
+    description: Surname, first names — as recorded by ASIC. Substring match.
+    role: dimension
+    dtype: string
+  ban_type:
+    source_column: BD_PER_TYPE
+    description: Type of banning order — e.g. "Banned Securities", "Banned Credit", "Australian Financial Services banning", "Disqualified from managing corporations".
+    role: dimension
+    dtype: string
+  doc_number:
+    source_column: BD_PER_DOC_NUM
+    description: ASIC document reference number for the banning order.
+    role: id
+    dtype: string
+  start_date:
+    source_column: BD_PER_START_DT
+    description: Date the banning order took effect (DD/MM/YYYY).
+    role: dimension
+    dtype: string
+  end_date:
+    source_column: BD_PER_END_DT
+    description: Date the banning order ends or ended (DD/MM/YYYY); blank or far-future date implies indefinite/permanent.
+    role: dimension
+    dtype: string
+  locality:
+    source_column: BD_PER_ADD_LOCAL
+    description: Suburb/town of the banned person's last known address.
+    role: dimension
+    dtype: string
+  state:
+    source_column: BD_PER_ADD_STATE
+    description: State or territory (NSW/VIC/QLD/SA/WA/TAS/NT/ACT).
+    role: dimension
+    dtype: string
+  postcode:
+    source_column: BD_PER_ADD_PCODE
+    description: Postcode of the banned person's last known address.
+    role: dimension
+    dtype: string
+  country:
+    source_column: BD_PER_ADD_COUNTRY
+    description: Country (typically "AUSTRALIA").
+    role: dimension
+    dtype: string
+  comments:
+    source_column: BD_PER_COMMENTS
+    description: Public comments recorded by ASIC about the banning order.
+    role: dimension
+    dtype: string
+dimension_values:
+  state:
+    nsw: NSW
+    vic: VIC
+    qld: QLD
+    sa: SA
+    wa: WA
+    tas: TAS
+    nt: NT
+    act: ACT
+    NSW: NSW
+    VIC: VIC
+    QLD: QLD
+    SA: SA
+    WA: WA
+    TAS: TAS
+    NT: NT
+    ACT: ACT

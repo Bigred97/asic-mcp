@@ -1,0 +1,159 @@
+id: ASIC_FINANCIAL_ADVISERS
+name: ASIC Financial Advisers Register
+description: |
+  Every person on ASIC's Financial Advisers Register — every individual who is
+  authorised to provide personal advice on relevant financial products to retail
+  clients in Australia. Roughly 21,000 records updated weekly by ASIC and
+  published to data.gov.au. Use this to answer "is X authorised to give
+  financial advice?", "find all current advisers under Westpac's AFS licence",
+  or "who provided advice in NSW between 2020 and 2024?".
+
+  Source: ASIC Financial Advisers Dataset, distributed via data.gov.au under
+  Creative Commons Attribution 3.0 Australia (CC BY 3.0 AU).
+period_coverage: current snapshot (weekly)
+update_frequency: weekly
+source_url: https://data.gov.au/data/dataset/asic-financial-adviser
+download_url: https://data.gov.au/data/dataset/f2b7c2c1-f4ef-4ae9-aba5-45c19e4d3038/resource/91d80440-5787-46fc-99de-0c1d93e6cc9f/download/financial_advisers_202605.csv
+discovery:
+  package_id: asic-financial-adviser
+  resource_name: Financial Advisers Dataset - Current
+format: csv
+header_row: 1
+layout: wide
+cache_kind: register
+search_keywords:
+  - financial adviser
+  - financial advisor
+  - financial advice
+  - adviser register
+  - moneysmart
+  - is X a registered adviser
+  - afsl rep
+  - authorised representative
+  - personal advice
+  - retail clients
+  - professional standards
+columns:
+  register_name:
+    source_column: REGISTER_NAME
+    description: Always "Financial Advisers". Constant.
+    role: dimension
+    dtype: string
+  adviser_name:
+    source_column: ADV_NAME
+    description: Full legal name of the adviser. Free-form substring match.
+    role: dimension
+    dtype: string
+  adviser_number:
+    source_column: ADV_NUMBER
+    description: ASIC-assigned adviser number (unique per adviser, with leading zeros).
+    role: id
+    dtype: string
+  adviser_role:
+    source_column: ADV_ROLE
+    description: Role under the register (e.g. "Financial Adviser", "Provisional Financial Adviser").
+    role: dimension
+    dtype: string
+  adviser_role_status:
+    source_column: ADV_ROLE_STATUS
+    description: Status of the role — "Current" or "Ceased".
+    role: dimension
+    dtype: string
+  adviser_abn:
+    source_column: ADV_ABN
+    description: ABN attached to the adviser, when supplied.
+    role: dimension
+    dtype: string
+  first_provided_advice:
+    source_column: ADV_FIRST_PROVIDED_ADVICE
+    description: Year the adviser first provided personal advice on relevant financial products.
+    role: dimension
+    dtype: string
+  licence_name:
+    source_column: LICENCE_NAME
+    description: Legal name of the AFS licensee that authorises the adviser.
+    role: dimension
+    dtype: string
+  licence_number:
+    source_column: LICENCE_NUMBER
+    description: AFS licence number of the authorising licensee.
+    role: dimension
+    dtype: string
+  licence_abn:
+    source_column: LICENCE_ABN
+    description: ABN of the authorising AFS licensee.
+    role: dimension
+    dtype: string
+  adv_start_date:
+    source_column: ADV_START_DT
+    description: Date the adviser was first added to the register (DD/MM/YYYY).
+    role: dimension
+    dtype: string
+  adv_end_date:
+    source_column: ADV_END_DT
+    description: Date the adviser's authorisation ended (DD/MM/YYYY); blank if current.
+    role: dimension
+    dtype: string
+  overall_registration_status:
+    source_column: OVERALL_REGISTRATION_STATUS
+    description: Overall current/ceased status across all licensees.
+    role: dimension
+    dtype: string
+  registration_status_under_afsl:
+    source_column: REGISTRATION_STATUS_UNDER_AFSL
+    description: Status under the currently-listed AFS licence.
+    role: dimension
+    dtype: string
+  state:
+    source_column: ADV_ADD_STATE
+    description: State or territory of the adviser's registered address (NSW/VIC/QLD/SA/WA/TAS/NT/ACT).
+    role: dimension
+    dtype: string
+  postcode:
+    source_column: ADV_ADD_PCODE
+    description: Postcode of the adviser's registered address.
+    role: dimension
+    dtype: string
+  country:
+    source_column: ADV_ADD_COUNTRY
+    description: Country of the adviser's registered address.
+    role: dimension
+    dtype: string
+  qualifications:
+    source_column: QUALIFICATIONS_AND_TRAINING
+    description: Free-text qualifications and training history.
+    role: dimension
+    dtype: string
+  memberships:
+    source_column: MEMBERSHIPS
+    description: Professional memberships disclosed to ASIC.
+    role: dimension
+    dtype: string
+dimension_values:
+  state:
+    nsw: NSW
+    vic: VIC
+    qld: QLD
+    sa: SA
+    wa: WA
+    tas: TAS
+    nt: NT
+    act: ACT
+    NSW: NSW
+    VIC: VIC
+    QLD: QLD
+    SA: SA
+    WA: WA
+    TAS: TAS
+    NT: NT
+    ACT: ACT
+  overall_registration_status:
+    current: Current
+    ceased: Ceased
+    Current: Current
+    Ceased: Ceased
+  adviser_role_status:
+    current: Current
+    ceased: Ceased
+    Current: Current
+    Ceased: Ceased

@@ -1,0 +1,73 @@
+id: ASIC_BANNED_ORGS
+name: ASIC Banned and Disqualified Organisations Register
+description: |
+  Every organisation ASIC has banned, disqualified, or excluded from financial
+  services or credit activities. The companion register to ASIC_BANNED_PERSONS
+  — same shape, but for entities (companies, partnerships, sole traders
+  trading under a business name). Updated weekly. Use this to check whether a
+  company name appears on ASIC's banning record.
+
+  Source: ASIC Banned and Disqualified Organisations Dataset, distributed via
+  data.gov.au under Creative Commons Attribution 3.0 Australia (CC BY 3.0 AU).
+period_coverage: current snapshot (weekly)
+update_frequency: weekly
+source_url: https://data.gov.au/data/dataset/asic-banned-disqualified-org
+download_url: https://data.gov.au/data/dataset/a5fde808-ba32-4cee-bfcb-fbb3afa56a28/resource/ced03961-e6f7-4263-895a-0fd1d7996043/download/bd_org_202605.csv
+discovery:
+  package_id: asic-banned-disqualified-org
+  resource_name: Banned and Disqualified Organisations - Current
+format: csv
+header_row: 1
+layout: wide
+cache_kind: register
+search_keywords:
+  - banned organisation
+  - banned company
+  - disqualified corporation
+  - banning order organisation
+  - banned firm
+  - asic enforcement organisations
+  - is this company banned
+  - banned business name
+columns:
+  register_name:
+    source_column: REGISTER_NAME
+    description: Always "Banned and Disqualified Organisations". Constant.
+    role: dimension
+    dtype: string
+  acn:
+    source_column: BD_ORG_ACN
+    description: Australian Company Number (ACN) of the banned organisation, where applicable.
+    role: id
+    dtype: string
+  org_name:
+    source_column: BD_ORG_NAME
+    description: Legal name of the banned organisation. Substring match supported.
+    role: dimension
+    dtype: string
+  ban_type:
+    source_column: BD_ORG_TYPE
+    description: Type of banning order — e.g. "Australian Financial Services banning", "Credit banning by a State or Territory".
+    role: dimension
+    dtype: string
+  url:
+    source_column: BD_ORG_URL
+    description: Link to the public ASIC register page for the banning order, when available.
+    role: dimension
+    dtype: string
+  start_date:
+    source_column: BD_ORG_START_DT
+    description: Date the banning order took effect (DD/MM/YYYY).
+    role: dimension
+    dtype: string
+  end_date:
+    source_column: BD_ORG_END_DT
+    description: Date the banning order ends or ended (DD/MM/YYYY); blank or far-future date implies indefinite/permanent.
+    role: dimension
+    dtype: string
+  comments:
+    source_column: BD_ORG_COMMENT
+    description: Public comments recorded by ASIC about the banning order.
+    role: dimension
+    dtype: string
+dimension_values: {}

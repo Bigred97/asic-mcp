@@ -1,0 +1,128 @@
+id: ASIC_LIQUIDATOR
+name: ASIC Registered Liquidator Register
+description: |
+  Every Registered Liquidator and Official Liquidator authorised by ASIC under
+  the Corporations Act to administer external administrations of insolvent
+  companies. Tiny but high-value: ~700 active insolvency practitioners,
+  updated weekly. Use this to confirm a liquidator's status, find liquidators
+  by firm or state, or check the date someone became registered.
+
+  Source: ASIC Liquidator Dataset, distributed via data.gov.au under
+  Creative Commons Attribution 3.0 Australia (CC BY 3.0 AU).
+period_coverage: current snapshot (weekly)
+update_frequency: weekly
+source_url: https://data.gov.au/data/dataset/asic-liquidator
+download_url: https://data.gov.au/data/dataset/388c5a74-fa9e-4b48-8881-95467e92fe6a/resource/02388d87-3f0b-48fd-bffa-c4a661962fc3/download/liquidator_202605.csv
+discovery:
+  package_id: asic-liquidator
+  resource_name: Liquidator Dataset - Current
+format: csv
+header_row: 1
+layout: wide
+cache_kind: register
+search_keywords:
+  - registered liquidator
+  - official liquidator
+  - insolvency practitioner
+  - external administrator
+  - voluntary administrator
+  - find liquidator
+  - is this liquidator registered
+  - kordamentha
+  - mcgrathnicol
+  - bankruptcy trustee
+columns:
+  register_name:
+    source_column: REGISTER_NAME
+    description: Always "Liquidator". Constant.
+    role: dimension
+    dtype: string
+  liquidator_number:
+    source_column: LIQ_NUM
+    description: ASIC-assigned registered liquidator number.
+    role: id
+    dtype: string
+  official_liquidator_number:
+    source_column: OFF_LIQ_NUM
+    description: ASIC-assigned official-liquidator number, when the practitioner is also an Official Liquidator.
+    role: dimension
+    dtype: string
+  liquidator_name:
+    source_column: LIQ_NAME
+    description: Surname, first names of the liquidator. Substring match.
+    role: dimension
+    dtype: string
+  liquidator_start_date:
+    source_column: LIQ_START_DT
+    description: Date the practitioner became a Registered Liquidator (DD/MM/YYYY).
+    role: dimension
+    dtype: string
+  official_liquidator_start_date:
+    source_column: OFF_LIQ_START_DT
+    description: Date the practitioner became an Official Liquidator, if applicable.
+    role: dimension
+    dtype: string
+  current_status:
+    source_column: LIQ_STATUS
+    description: Current status code (e.g. "APPR" = approved/current, "SUSP" = suspended, "DISQ" = disqualified, "EXPI" = expired).
+    role: dimension
+    dtype: string
+  suspended_date:
+    source_column: LIQ_SUSP_DT
+    description: Date the practitioner was suspended, if applicable.
+    role: dimension
+    dtype: string
+  locality:
+    source_column: LIQ_ADD_LOCAL
+    description: Suburb/town of the registered office address.
+    role: dimension
+    dtype: string
+  state:
+    source_column: LIQ_ADD_STATE
+    description: State or territory (NSW/VIC/QLD/SA/WA/TAS/NT/ACT).
+    role: dimension
+    dtype: string
+  postcode:
+    source_column: LIQ_ADD_PCODE
+    description: Postcode of the registered office address.
+    role: dimension
+    dtype: string
+  country:
+    source_column: LIQ_ADD_COUNTRY
+    description: Country (typically "Australia").
+    role: dimension
+    dtype: string
+  firm:
+    source_column: LIQ_FIRM
+    description: Firm name the liquidator practises under (KordaMentha, McGrathNicol, etc.).
+    role: dimension
+    dtype: string
+dimension_values:
+  state:
+    nsw: NSW
+    vic: VIC
+    qld: QLD
+    sa: SA
+    wa: WA
+    tas: TAS
+    nt: NT
+    act: ACT
+    NSW: NSW
+    VIC: VIC
+    QLD: QLD
+    SA: SA
+    WA: WA
+    TAS: TAS
+    NT: NT
+    ACT: ACT
+  current_status:
+    approved: APPR
+    current: APPR
+    active: APPR
+    suspended: SUSP
+    disqualified: DISQ
+    expired: EXPI
+    APPR: APPR
+    SUSP: SUSP
+    DISQ: DISQ
+    EXPI: EXPI
