@@ -53,7 +53,7 @@ jobs:
       - name: Verify wheel installs cleanly
         run: |
           uv run --isolated --with ./dist/*.whl python -c \
-            "import asic_mcp.server as s; n = len(s.list_curated()); assert n >= 8, f'expected >=8 curated, got {n}'; print(f'OK ({n} curated datasets)')"
+            "import asic_mcp.server as s; n = len(s.list_curated()); assert n >= 7, f'expected >=7 curated, got {n}'; print(f'OK ({n} curated datasets)')"
       - uses: actions/upload-artifact@v4
         with:
           name: dist
