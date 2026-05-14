@@ -1,0 +1,236 @@
+# asic-mcp — full reference
+
+> MCP server exposing Australian Securities and Investments Commission registers through 5 plain-English tools.
+
+asic-mcp fetches ASIC's weekly-updated CSV registers via data.gov.au's CKAN, resolving the freshest resource UUID at fetch time. 7 curated registers cover every person/entity ASIC supervises in financial services. This document is a self-contained integration reference.
+
+---
+
+## Install
+
+```bash
+uvx --upgrade asic-mcp
+# or
+pip install asic-mcp
+```
+
+### Claude Desktop
+
+```json
+{
+  "mcpServers": {
+    "asic": { "command": "uvx", "args": ["--upgrade", "asic-mcp"] }
+  }
+}
+```
+
+### Claude Code
+
+```bash
+claude mcp add asic --command uvx --args -- --upgrade asic-mcp
+```
+
+---
+
+## Trust contract
+
+Every `DataResponse` carries:
+
+```
+source             "Australian Securities and Investments Commission (ASIC), via data.gov.au"
+source_url         the data.gov.au dataset page
+download_url       actual CSV URL used (post-CKAN-discovery)
+attribution        full CC-BY 3.0 Australia attribution string with licence URL
+retrieved_at       UTC timestamp
+server_version     importlib.metadata.version("asic-mcp")
+stale              True when serving cached fallback after upstream error
+stale_reason       human-readable when stale=True
+truncated_at       int | None — set when latest() caps a large register
+```
+
+Cache TTLs: 24-hour byte cache (ASIC weekly cadence), 1-hour CKAN catalogue, 15-minute `latest`. ASIC sends a polite User-Agent because data.gov.au's CDN blocks the default httpx UA.
+
+**CC-BY 3.0 Australia** (not 4.0 International) — matches APRA / ATO / AIHW. Per-individual register publication is an explicit ASIC public-disclosure regime.
+
+---
+
+## Tools
+
+### search_datasets(query, limit=10)
+
+```python
+await search_datasets("financial adviser")
+# → [{id: 'ASIC_FINANCIAL_ADVISERS', name: 'Financial Advisers Register', ...}]
+
+await search_datasets("banned")
+# → [ASIC_BANNED_PERSONS, ASIC_BANNED_ORGS, ...]
+```
+
+### describe_dataset(dataset_id)
+
+Returns `DatasetDetail` with id, name, description, period_coverage, dimensions, source_url, download_url.
+
+```python
+await describe_dataset("ASIC_FINANCIAL_ADVISERS")
+# → 76 fields in the register; primary filters: current_status, state, licensee_name, adviser_number
+```
+
+### get_data(dataset_id, filters=None, start_period=None, end_period=None, format="records")
+
+Plain-English filter keys. Pass a list to OR across values. Period format: `YYYY` / `YYYY-MM` / `YYYY-MM-DD` — applies to time-bounded fields (date of registration, date banned, etc.).
+
+```python
+# All currently registered financial advisers in NSW
+await get_data("ASIC_FINANCIAL_ADVISERS",
+               filters={"current_status": "current", "state": "nsw"})
+
+# AFS licensees whose legal name contains "Macquarie"
+await get_data("ASIC_AFS_LICENSEE",
+               filters={"licensee_name": "Macquarie"})
+
+# Persons banned after 2024
+await get_data("ASIC_BANNED_PERSONS",
+               start_period="2024-01-01")
+```
+
+### latest(dataset_id, filters=None, limit=50)
+
+Returns the current register snapshot capped at `limit` (default 50, max 10000). When `len(records) > limit`, `truncated_at` is set to the original count so the agent can detect and surface it. Pass precise filters (e.g. `adviser_number`) to drill into one entity with no truncation.
+
+```python
+# Current registered status for one adviser (precise filter, no truncation)
+await latest("ASIC_FINANCIAL_ADVISERS",
+             filters={"adviser_number": "1234567"})
+
+# First 50 most-recent banned persons (truncated; full count in resp.truncated_at)
+await latest("ASIC_BANNED_PERSONS")
+
+# Get 500 rows in one go
+await latest("ASIC_AFS_LICENSEE", limit=500)
+```
+
+### list_curated()
+
+```python
+list_curated()
+# → ['ASIC_AFS_AUTH_REP', 'ASIC_AFS_LICENSEE', 'ASIC_BANNED_ORGS',
+#    'ASIC_BANNED_PERSONS', 'ASIC_CREDIT_LICENSEE',
+#    'ASIC_FINANCIAL_ADVISERS', 'ASIC_LIQUIDATOR']
+```
+
+---
+
+## Curated registers (7)
+
+### ASIC_FINANCIAL_ADVISERS
+
+Every individual on the Financial Advisers Register.
+
+- coverage: ~21,000 records, 76 columns
+- filters: current_status, state, licensee_name, adviser_number, year_first_provided_personal_advice, qualifications
+- update_frequency: weekly
+- source: data.gov.au slug `asic-financial-adviser`
+
+### ASIC_AFS_LICENSEE
+
+Every Australian Financial Services Licensee.
+
+- coverage: ~6,500 entities
+- filters: current_status, state, licensee_name, afsl_number
+- update_frequency: weekly
+- source: `asic-afs-licensee`
+
+### ASIC_AFS_AUTH_REP
+
+Every AFS Authorised Representative — appointees under each AFSL.
+
+- coverage: ~360,000 rows (largest register)
+- filters: current_status, state, licensee_name, ar_number
+- update_frequency: weekly
+- source: `asic-afs-authorised-representative`
+
+### ASIC_CREDIT_LICENSEE
+
+Every Australian Credit Licensee — NCCP-regulated lenders, brokers, BNPL providers.
+
+- filters: current_status, state, licensee_name, acl_number
+- update_frequency: weekly
+- source: `asic-credit-licensee`
+
+### ASIC_BANNED_PERSONS
+
+Persons banned/disqualified from financial services, credit, or managing corporations.
+
+- filters: state, ban_type, date_of_banning_or_disqualification
+- update_frequency: weekly
+- source: `asic-banned-disqualified-per`
+
+### ASIC_BANNED_ORGS
+
+Organisations banned/disqualified — companion register to ASIC_BANNED_PERSONS.
+
+- filters: state, ban_type, date_of_banning_or_disqualification
+- update_frequency: weekly
+- source: `asic-banned-disqualified-org`
+
+### ASIC_LIQUIDATOR
+
+Every Registered Liquidator and Official Liquidator.
+
+- coverage: ~700 insolvency practitioners
+- filters: state, liquidator_name
+- update_frequency: weekly
+- source: `asic-liquidator`
+
+---
+
+## Worked examples
+
+### Adviser compliance check
+
+```python
+resp = await latest("ASIC_FINANCIAL_ADVISERS",
+                    filters={"adviser_number": "000221137"})
+# → resp.records[0]: dimensions has adviser_name, current/ceased status,
+#   current_licensee, year_first_provided_personal_advice, qualifications, ...
+```
+
+### Banned-persons surname lookup
+
+```python
+resp = await get_data("ASIC_BANNED_PERSONS",
+                      filters={"family_name": "Smith"},
+                      start_period="2020-01-01")
+# → list of ban records with ban_type, dates, public_comment
+```
+
+### AFSL credentials
+
+```python
+resp = await latest("ASIC_AFS_LICENSEE",
+                    filters={"afsl_number": "234945"})
+# → single record with licensee_name, current_status,
+#   class_of_authorisations, financial_services_authorised, ...
+```
+
+### Liquidator search
+
+```python
+resp = await get_data("ASIC_LIQUIDATOR",
+                      filters={"firm_name": "KordaMentha",
+                               "state": ["nsw", "vic"]})
+```
+
+---
+
+## Cross-source pairings
+
+- [apra-mcp](https://pypi.org/project/apra-mcp/) for prudential capital + super fund context against AFS-licensee firms
+- [ato-mcp](https://pypi.org/project/ato-mcp/) for corporate tax transparency cross-check on the same legal entities (match by ABN)
+- [aus-identity](https://pypi.org/project/aus-identity/) for state-filter compatibility across registers
+
+---
+
+## License
+
+asic-mcp server code is MIT-licensed. ASIC register data carries CC-BY 3.0 Australia; the attribution is echoed on every response.
