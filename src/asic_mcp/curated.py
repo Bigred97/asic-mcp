@@ -26,7 +26,6 @@ from aus_identity import (
     postcode_to_state,
 )
 
-
 # Dim names whose values are state references. When `translate_filter_value`
 # sees one, the user input is run through aus_identity first so "NSW", "nsw",
 # "New South Wales", "AU-NSW", "Tassie", and 4-digit postcodes all resolve.
