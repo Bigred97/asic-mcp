@@ -131,9 +131,29 @@ def _validate_filters(filters: Any) -> dict[str, Any]:
 def _validate_period(value: Any, field_name: str) -> str | None:
     if value is None:
         return None
+    # LLM clients routinely send JSON ints (e.g. {"start_period": 2024}). Coerce
+    # 4-digit ints in a realistic year range to the canonical "YYYY" string at the
+    # boundary so we don't surface a confusing type error downstream.
+    if isinstance(value, bool):
+        # bool is a subclass of int; reject it explicitly before the int branch.
+        raise ValueError(
+            f"{field_name} must be a string or int year, got bool. "
+            f"Try {field_name}='2024' (year), '2024-05' (month), '2024-01-01' (date), "
+            "or 2024 (int year)."
+        )
+    if isinstance(value, int):
+        if 1900 <= value <= 2100:
+            value = str(value)
+        else:
+            raise ValueError(
+                f"{field_name} integer {value} out of range. "
+                f"For year-only periods pass a 4-digit year like 2024, or use string "
+                f"forms 'YYYY' (e.g. '2026'), 'YYYY-MM' (e.g. '2026-05'), or "
+                f"'YYYY-MM-DD' (e.g. '2026-05-15'). Try {field_name}='2024'."
+            )
     if not isinstance(value, str):
         raise ValueError(
-            f"{field_name} must be a string like '2026', '2026-05', or "
+            f"{field_name} must be a string or int year like '2026', '2026-05', or "
             f"'2026-05-15', got {type(value).__name__}. "
             f"Try {field_name}='2024' to bound by year, or '2024-01-01' "
             "for a precise date cutoff."
@@ -501,21 +521,22 @@ async def get_data(
         ),
     ] = None,
     start_period: Annotated[
-        str | None,
+        str | int | None,
         Field(
             description=(
                 "Inclusive start date for time-bounded register fields "
                 "(date of registration, date banned, etc.). "
-                "Format: 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'."
+                "Format: 'YYYY', 'YYYY-MM', or 'YYYY-MM-DD'. "
+                "Bare int years like 2020 are coerced to '2020' automatically."
             ),
-            examples=["2020", "2020-07", "2024-01-01"],
+            examples=["2020", "2020-07", "2024-01-01", 2020],
         ),
     ] = None,
     end_period: Annotated[
-        str | None,
+        str | int | None,
         Field(
             description="Inclusive end date. Same format as start_period.",
-            examples=["2026", "2026-12-31"],
+            examples=["2026", "2026-12-31", 2026],
         ),
     ] = None,
     format: Annotated[
