@@ -16,6 +16,7 @@ headers and dimension values.
 from __future__ import annotations
 
 import asyncio
+import difflib
 import hashlib
 import re
 from collections import OrderedDict
@@ -80,6 +81,22 @@ async def reset_client_for_tests() -> None:
         _client = None
 
 
+def _suggest_dataset_id(bad_id: str) -> str:
+    """Build a 'Did you mean X?' hint for an unknown dataset ID.
+
+    Uses difflib's get_close_matches against curated.list_ids() so a typo
+    like 'ASIC_FINANCIAL_ADVISOR' resolves to 'ASIC_FINANCIAL_ADVISERS'.
+    Returns empty string if no close match clears the cutoff so we can
+    skip the "Did you mean" clause cleanly.
+    """
+    try:
+        known = curated.list_ids()
+    except Exception:
+        return ""
+    matches = difflib.get_close_matches(bad_id.upper(), known, n=1, cutoff=0.6)
+    return matches[0] if matches else ""
+
+
 def _normalize_dataset_id(dataset_id: Any) -> str:
     if not isinstance(dataset_id, str):
         raise ValueError(
@@ -116,8 +133,10 @@ def _validate_period(value: Any, field_name: str) -> str | None:
         return None
     if not isinstance(value, str):
         raise ValueError(
-            f"{field_name} must be a string like '2026' or '2026-05', "
-            f"got {type(value).__name__}."
+            f"{field_name} must be a string like '2026', '2026-05', or "
+            f"'2026-05-15', got {type(value).__name__}. "
+            f"Try {field_name}='2024' to bound by year, or '2024-01-01' "
+            "for a precise date cutoff."
         )
     s = value.strip()
     if not s:
@@ -164,7 +183,12 @@ async def _fetch_and_parse(cd: curated.CuratedDataset, *, kind: str = "data"):
         body = await client.fetch_resource(url, kind=kind)  # type: ignore[arg-type]
     except ASICAPIError as e:
         raise ValueError(
-            f"Could not fetch dataset {cd.id} from data.gov.au. ({e})"
+            f"Could not fetch dataset {cd.id} from data.gov.au ({e}). "
+            "data.gov.au is the upstream — transient 5xx / DNS errors usually "
+            "clear on retry within a few minutes. If a cached payload was "
+            f"available, this call would have served it with stale=True; the "
+            f"cache for {cd.id} is empty. Try again shortly or visit "
+            f"{cd.source_url} to confirm the dataset is still published."
         ) from e
 
     # Content-aware cache key. We can't hash the whole body on every warm call
@@ -273,10 +297,15 @@ async def search_datasets(
         )
     if isinstance(limit, bool) or not isinstance(limit, int):
         raise ValueError(
-            f"limit must be a positive integer, got {limit!r} ({type(limit).__name__})."
+            f"limit must be a positive integer, got {limit!r} "
+            f"({type(limit).__name__}). Try limit=10 for a sample, or "
+            "limit=50 for richer results. Valid range: 1 to 50."
         )
     if limit < 1:
-        raise ValueError(f"limit must be >= 1, got {limit}.")
+        raise ValueError(
+            f"limit must be between 1 and 50, got {limit}. "
+            "Try limit=10 for a quick scan or limit=50 for the full ranked list."
+        )
     return catalog.search(query, limit=limit)
 
 
@@ -312,9 +341,18 @@ async def describe_dataset(
     norm_id = _normalize_dataset_id(dataset_id)
     cd = curated.get(norm_id)
     if cd is None:
+        suggestion = _suggest_dataset_id(norm_id)
+        hint = (
+            f"Did you mean {suggestion!r}? "
+            if suggestion
+            else ""
+        )
+        valid = curated.list_ids()
         raise ValueError(
             f"Dataset {dataset_id!r} is not a curated asic-mcp dataset. "
-            "Try list_curated() to see available IDs."
+            f"{hint}"
+            f"Valid options: {valid}. "
+            "Try search_datasets('<topic>') or list_curated() to discover IDs."
         )
     dims_out = [
         ColumnDetail(
@@ -366,9 +404,18 @@ async def _get_data_impl(
     norm_id = _normalize_dataset_id(dataset_id)
     cd = curated.get(norm_id)
     if cd is None:
+        suggestion = _suggest_dataset_id(norm_id)
+        hint = (
+            f"Did you mean {suggestion!r}? "
+            if suggestion
+            else ""
+        )
+        valid = curated.list_ids()
         raise ValueError(
             f"Dataset {dataset_id!r} is not a curated asic-mcp dataset. "
-            "Try list_curated() to see available IDs."
+            f"{hint}"
+            f"Valid options: {valid}. "
+            "Try search_datasets('<topic>') or list_curated() to discover IDs."
         )
     filters_d = _validate_filters(filters)
     start_v = _validate_period(start_period, "start_period")

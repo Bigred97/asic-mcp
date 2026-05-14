@@ -138,7 +138,7 @@ def test_filter_free_form_substring_match_fails_by_default(afs_licensee_csv):
 
 def test_filter_unknown_dimension_raises(afs_licensee_csv):
     cd, df = _load(afs_licensee_csv, "ASIC_AFS_LICENSEE")
-    with pytest.raises(ValueError, match="Unknown filter"):
+    with pytest.raises(ValueError, match="is not a column on"):
         _build(cd, df, filters={"definitely_not_a_dimension": "x"})
 
 

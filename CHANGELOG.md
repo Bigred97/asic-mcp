@@ -5,6 +5,62 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.3] — 2026-05-15
+
+Error-message sweep — closes CLAUDE.md quality dimension #5 (Deterministic
+Error Handling). Rejection messages now suggest the correction rather than
+just describing the failure.
+
+### Changed — `ValueError` messages now suggest the fix
+
+Following the same `Try X` / `Did you mean X?` / `Valid options: ...`
+pattern as the rest of the sister stack, weak rejection messages were
+rewritten so an agent (or a human reading a traceback) gets an obvious
+next step rather than a dead-end string.
+
+Touched sites:
+
+- Unknown dataset id on `describe_dataset` and `get_data` — now runs the
+  bad id through `difflib.get_close_matches` against `curated.list_ids()`
+  and prepends "Did you mean `'ASIC_FINANCIAL_ADVISERS'`?" before the full
+  list of valid ids. A typo like `'ASIC_FINANCIAL_ADVISOR'` now resolves
+  to a one-line correction.
+- Unknown filter key in `shaping._apply_filters` — was generic "Unknown
+  filter `'foo'` for dataset `'X'`. Try one of: a, b, c"; now: "Filter
+  `'adviser_no'` is not a column on `ASIC_FINANCIAL_ADVISERS`. Did you
+  mean `'adviser_number'`? Valid filters: ... Try `describe_dataset(...)`
+  to see all filter columns."
+- Unknown dimension value in `curated.translate_filter_value` — adds a
+  difflib hint across both plain-English aliases and canonical source
+  values, plus a "Try `describe_dataset(...)`" pointer.
+- Unknown measure key in `curated.resolve_measure_keys` — adds difflib
+  hint + describe pointer. Special-cases dimension-only registers (all of
+  ASIC's v0.1 datasets) with a clearer "this dataset has no curated
+  measures — omit `measures` to return all rows" message.
+- `search_datasets(limit=...)` rejections — limit-out-of-range message
+  now states the valid range (1-50) and gives concrete examples.
+- `_validate_period` non-string rejection — message now includes the
+  three accepted formats (YYYY, YYYY-MM, YYYY-MM-DD) and worked examples.
+- `_fetch_and_parse` upstream-fetch error — explains that data.gov.au is
+  the upstream, that transient 5xx / DNS errors usually clear on retry,
+  that a cached fallback would have been served if available, and points
+  at the dataset's source URL for verification.
+
+No exception types changed; only the message text. No new dependencies
+(`difflib` is stdlib).
+
+### Tests
+
+- 2 new regression tests in `test_server_validation.py`:
+  - typo'd dataset id triggers `Did you mean 'ASIC_FINANCIAL_ADVISERS'`
+  - typo'd filter key triggers `Did you mean 'adviser_number'` plus
+    `describe_dataset` pointer
+- 3 existing assertions in `test_edge_inputs.py`, `test_register_shape.py`,
+  and `test_server_validation.py` updated to match the new message
+  substrings (exception type unchanged).
+
+237 unit tests now (was 235); 10× zero-flake gauntlet.
+
 ## [0.1.2] — 2026-05-15
 
 Reliability release — closes CLAUDE.md quality dimension #4 (Reliability +

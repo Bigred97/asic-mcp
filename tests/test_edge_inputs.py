@@ -265,7 +265,7 @@ async def test_get_data_empty_filter_dict_returns_all(mocked_client):
 
 @pytest.mark.asyncio
 async def test_get_data_unknown_filter_raises(mocked_client):
-    with pytest.raises(ValueError, match="Unknown filter"):
+    with pytest.raises(ValueError, match="is not a column on"):
         await server.get_data(
             "ASIC_AFS_LICENSEE", filters={"nonsense_dimension": "x"},
         )

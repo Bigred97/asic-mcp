@@ -14,6 +14,7 @@ happens on aliases too.
 """
 from __future__ import annotations
 
+import difflib
 import math
 from datetime import UTC, datetime
 from typing import Any
@@ -135,9 +136,14 @@ def _apply_filters(
     for user_key, user_val in filters.items():
         if user_key not in valid_dim_keys:
             valid = sorted(valid_dim_keys)
+            close = difflib.get_close_matches(user_key, valid, n=1, cutoff=0.6)
+            hint = f"Did you mean {close[0]!r}? " if close else ""
             raise ValueError(
-                f"Unknown filter {user_key!r} for dataset {cd.id!r}. "
-                f"Try one of: {', '.join(valid[:15])}"
+                f"Filter {user_key!r} is not a column on {cd.id}. "
+                f"{hint}"
+                f"Valid filters: {', '.join(valid[:10])}"
+                f"{'...' if len(valid) > 10 else ''}. "
+                f"Try describe_dataset({cd.id!r}) to see all filter columns."
             )
         # Lists mean "OR" across values.
         if isinstance(user_val, list):

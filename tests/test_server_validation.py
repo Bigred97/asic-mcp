@@ -31,7 +31,7 @@ async def test_search_datasets_non_string_query():
 
 @pytest.mark.asyncio
 async def test_search_datasets_limit_too_small():
-    with pytest.raises(ValueError, match=">= 1"):
+    with pytest.raises(ValueError, match="between 1 and 50"):
         await server.search_datasets("financial adviser", limit=0)
 
 
@@ -175,3 +175,43 @@ async def test_latest_no_truncation_when_under_limit(monkeypatch):
 # MCP protocol boundary — not when calling the function directly from Python.
 # The truncation logic above is what asic-mcp owns and is exercised by the two
 # preceding tests. Boundary behaviour is the framework's contract, not ours.
+
+
+# ─── error-message hint regressions (CLAUDE.md quality dim #5) ───
+# Rejections should suggest the correction via "Did you mean X?" + "Try X"
+# rather than just describing the failure.
+
+@pytest.mark.asyncio
+async def test_describe_unknown_dataset_suggests_close_match():
+    """A typo'd dataset id should trigger a 'Did you mean' hint pointing at
+    the closest curated id."""
+    with pytest.raises(ValueError) as exc_info:
+        # One-char typo: ADVISER -> ADVISOR
+        await server.describe_dataset("ASIC_FINANCIAL_ADVISOR")
+    msg = str(exc_info.value)
+    assert "Did you mean" in msg
+    assert "ASIC_FINANCIAL_ADVISERS" in msg
+    # And the hint should still point at discovery tools
+    assert "list_curated" in msg or "search_datasets" in msg
+
+
+def test_unknown_filter_suggests_close_match_via_shaping():
+    """Mistyped filter keys ('adviser_no' instead of 'adviser_number')
+    should surface a difflib 'Did you mean' suggestion plus a pointer at
+    describe_dataset(). Asserts against shaping._apply_filters directly so
+    the test stays network-free."""
+    import pandas as pd
+
+    from asic_mcp import curated as curated_mod
+    from asic_mcp import shaping
+
+    cd = curated_mod.get("ASIC_FINANCIAL_ADVISERS")
+    assert cd is not None
+    df = pd.DataFrame({c.source_column: [] for c in cd.columns.values()})
+    with pytest.raises(ValueError) as exc_info:
+        shaping._apply_filters(df, cd, {"adviser_no": "1234567"})
+    msg = str(exc_info.value)
+    assert "is not a column on" in msg
+    assert "Did you mean" in msg
+    assert "adviser_number" in msg
+    assert "describe_dataset" in msg

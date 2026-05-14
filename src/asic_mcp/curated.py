@@ -13,6 +13,7 @@ instructions the shaping layer can apply to the parsed DataFrame.
 """
 from __future__ import annotations
 
+import difflib
 from dataclasses import dataclass
 from importlib import resources
 from pathlib import Path
@@ -233,10 +234,17 @@ def translate_filter_value(
     if user_value in dv.values.values():
         return user_value
     valid = sorted(dv.values.keys())
+    # Match against both aliases and canonical values so a typo'd canonical
+    # ("New South Whales") still routes through difflib.
+    haystack = list(valid) + sorted(set(dv.values.values()))
+    close = difflib.get_close_matches(user_value, haystack, n=1, cutoff=0.6)
+    hint = f"Did you mean {close[0]!r}? " if close else ""
     raise ValueError(
         f"Unknown value {user_value!r} for filter {dim_key!r} on dataset {cd.id!r}. "
-        f"Try one of: {', '.join(valid[:15])}"
-        + ("..." if len(valid) > 15 else "")
+        f"{hint}"
+        f"Valid options: {', '.join(valid[:10])}"
+        + ("..." if len(valid) > 10 else "")
+        + f". Try describe_dataset({cd.id!r}) to see all accepted values."
     )
 
 
@@ -306,12 +314,26 @@ def resolve_measure_keys(
         elif v_str in source_to_key:
             out.append(source_to_key[v_str])
         else:
-            valid_hint = ", ".join(sorted(valid_keys)[:15]) if valid_keys else "(none — dataset has no curated measures)"
-            raise ValueError(
-                f"Unknown measure {v!r} for dataset {cd.id!r}. "
-                f"Try one of: {valid_hint}"
-                + ("..." if len(valid_keys) > 15 else "")
-            )
+            if valid_keys:
+                close = difflib.get_close_matches(
+                    v_str, sorted(valid_keys), n=1, cutoff=0.6
+                )
+                hint = f"Did you mean {close[0]!r}? " if close else ""
+                valid_hint = ", ".join(sorted(valid_keys)[:10])
+                ellipsis = "..." if len(valid_keys) > 10 else ""
+                raise ValueError(
+                    f"Unknown measure {v!r} for dataset {cd.id!r}. "
+                    f"{hint}"
+                    f"Valid measures: {valid_hint}{ellipsis}. "
+                    f"Try describe_dataset({cd.id!r}) to see the full measure list."
+                )
+            else:
+                raise ValueError(
+                    f"Unknown measure {v!r} for dataset {cd.id!r}. "
+                    f"This dataset has no curated measures — it is a "
+                    "dimension-only register. Omit `measures` to return all rows, "
+                    f"or try describe_dataset({cd.id!r}) to see the dimension list."
+                )
     # Dedupe while preserving order.
     seen: set[str] = set()
     return [k for k in out if not (k in seen or seen.add(k))]
