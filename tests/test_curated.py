@@ -140,6 +140,58 @@ def test_translate_filter_value_unknown_raises():
         curated.translate_filter_value(cd, "state", "wakanda")
 
 
+# ---- aus-identity cross-source normalisation on state filter ----
+
+
+def test_state_filter_accepts_full_name():
+    """`state='New South Wales'` resolves to canonical 'NSW'."""
+    cd = curated.get("ASIC_FINANCIAL_ADVISERS")
+    assert cd is not None
+    assert curated.translate_filter_value(cd, "state", "New South Wales") == "NSW"
+
+
+def test_state_filter_accepts_lowercase_full_name():
+    """`state='queensland'` (lowercase) resolves to 'QLD'."""
+    cd = curated.get("ASIC_FINANCIAL_ADVISERS")
+    assert cd is not None
+    assert curated.translate_filter_value(cd, "state", "queensland") == "QLD"
+
+
+def test_state_filter_accepts_iso_3166_form():
+    """`state='AU-VIC'` resolves to 'VIC'."""
+    cd = curated.get("ASIC_FINANCIAL_ADVISERS")
+    assert cd is not None
+    assert curated.translate_filter_value(cd, "state", "AU-VIC") == "VIC"
+
+
+def test_state_filter_accepts_common_alias():
+    """`state='Tassie'` resolves to 'TAS'."""
+    cd = curated.get("ASIC_FINANCIAL_ADVISERS")
+    assert cd is not None
+    assert curated.translate_filter_value(cd, "state", "Tassie") == "TAS"
+
+
+def test_state_filter_accepts_postcode_routing():
+    """`state='2000'` (Sydney CBD) routes to 'NSW'."""
+    cd = curated.get("ASIC_FINANCIAL_ADVISERS")
+    assert cd is not None
+    assert curated.translate_filter_value(cd, "state", "2000") == "NSW"
+
+
+def test_state_filter_postcode_in_act_routes_correctly():
+    """`state='2600'` (Parliament House) resolves to 'ACT', not 'NSW'."""
+    cd = curated.get("ASIC_FINANCIAL_ADVISERS")
+    assert cd is not None
+    assert curated.translate_filter_value(cd, "state", "2600") == "ACT"
+
+
+def test_state_filter_credit_licensee_accepts_full_name():
+    """Verify aus_identity works across multiple ASIC registers."""
+    cd = curated.get("ASIC_CREDIT_LICENSEE")
+    assert cd is not None
+    assert curated.translate_filter_value(cd, "state", "Victoria") == "VIC"
+
+
 def test_translate_filter_value_freeform_dimension_passes_through():
     """Dimensions without dimension_values map (e.g. licensee_name) pass through."""
     cd = curated.get("ASIC_AFS_LICENSEE")

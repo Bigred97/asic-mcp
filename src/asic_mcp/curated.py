@@ -20,6 +20,18 @@ from pathlib import Path
 from typing import Literal
 
 import yaml
+from aus_identity import (
+    is_valid_postcode,
+    normalize_state,
+    postcode_to_state,
+)
+
+
+# Dim names whose values are state references. When `translate_filter_value`
+# sees one, the user input is run through aus_identity first so "NSW", "nsw",
+# "New South Wales", "AU-NSW", "Tassie", and 4-digit postcodes all resolve.
+_STATE_LIKE_DIM_NAMES = frozenset({"state", "region", "state_territory"})
+
 
 Layout = Literal["wide", "transposed"]
 
@@ -215,6 +227,58 @@ def id_columns(cd: CuratedDataset) -> list[CuratedColumn]:
     return [c for c in cd.columns.values() if c.role == "id"]
 
 
+def _aus_identity_pass_through(user_value: str) -> str | None:
+    """Normalise a state-shaped value when there's no curated enum.
+
+    Returns the canonical short code ("NSW") or `None` if the input isn't
+    a state reference.
+    """
+    s = user_value.strip()
+    if not s:
+        return None
+    if s.isdigit() and is_valid_postcode(s):
+        try:
+            return postcode_to_state(s)
+        except ValueError:
+            return None
+    try:
+        return normalize_state(s)
+    except ValueError:
+        return None
+
+
+def _normalise_state_like(
+    user_value: str, alias_to_canonical: dict[str, str]
+) -> str | None:
+    """Resolve a state-shaped user value to the source-column value.
+
+    Returns the source-column value (a value from `alias_to_canonical`) if
+    `user_value` maps to a known state via `aus_identity`, else `None`.
+    """
+    s = user_value.strip()
+    if not s:
+        return None
+    if s.isdigit() and is_valid_postcode(s):
+        try:
+            code = postcode_to_state(s)
+        except ValueError:
+            return None
+    else:
+        try:
+            code = normalize_state(s)
+        except ValueError:
+            return None
+    if code in alias_to_canonical:
+        return alias_to_canonical[code]
+    lower = code.lower()
+    if lower in alias_to_canonical:
+        return alias_to_canonical[lower]
+    for v in alias_to_canonical.values():
+        if v.upper() == code:
+            return v
+    return None
+
+
 def translate_filter_value(
     cd: CuratedDataset, dim_key: str, user_value: str
 ) -> str:
@@ -224,15 +288,30 @@ def translate_filter_value(
     a plain-English alias (e.g. 'nsw') or the raw source value (e.g. 'NSW' or
     'New South Wales') — both resolve. If the dim is free-form (no enum), the
     raw value passes through.
+
+    State-shaped filters (`state`, `region`, `state_territory`) accept the
+    full cross-source menu via `aus_identity` — short codes, full names,
+    ISO 3166-2, common aliases, and 4-digit postcodes.
     """
     dv = cd.dimension_values.get(dim_key)
     if dv is None or dv.values is None:
+        # Free-form state-shaped dims (rare) still benefit from postcode
+        # routing: a user passing "2000" gets back "NSW" automatically.
+        if dim_key in _STATE_LIKE_DIM_NAMES:
+            normalised = _aus_identity_pass_through(user_value)
+            if normalised is not None:
+                return normalised
         return user_value
     if user_value in dv.values:
         return dv.values[user_value]
     # Maybe the user already passed the canonical value.
     if user_value in dv.values.values():
         return user_value
+    # Cross-source normalisation via aus_identity (state names, postcodes).
+    if dim_key in _STATE_LIKE_DIM_NAMES:
+        normalised = _normalise_state_like(user_value, dv.values)
+        if normalised is not None:
+            return normalised
     valid = sorted(dv.values.keys())
     # Match against both aliases and canonical values so a typo'd canonical
     # ("New South Whales") still routes through difflib.

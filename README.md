@@ -91,6 +91,13 @@ Adding a new dataset is a single YAML drop into `src/asic_mcp/data/curated/` —
 
 ## Example queries (paste into Claude)
 
+> **Cross-source compatibility.** The `state` filter on every register
+> accepts canonical state codes (`"NSW"`), full names (`"New South Wales"`),
+> case-insensitive variants (`"nsw"`), ISO 3166-2 (`"AU-NSW"`), and 4-digit
+> postcodes (`"2000"` → NSW). Powered by
+> [`aus-identity`](https://pypi.org/project/aus-identity/) — the same input
+> format works across abs-mcp, ato-mcp, apra-mcp, aihw-mcp, and asic-mcp.
+
 **Compliance check**: *"Confirm whether AFSL 234945 is a current AFS licensee, who the legal name is, and what financial services it's authorised to deal in."*
 
 **Consumer protection**: *"Has anyone with the surname 'Smith' been banned by ASIC in the last 5 years? Show the ban type, dates, and the public comment."*
