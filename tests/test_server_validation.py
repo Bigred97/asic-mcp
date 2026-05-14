@@ -105,3 +105,73 @@ def test_list_curated_returns_sorted_ids():
     assert "ASIC_FINANCIAL_ADVISERS" in ids
     assert "ASIC_BANNED_PERSONS" in ids
     assert len(ids) == 7
+
+
+# ─── latest() limit truncation (regression: context-bombing on large registers) ───
+
+@pytest.mark.asyncio
+async def test_latest_truncates_large_response_to_limit(monkeypatch):
+    """Regression: `latest()` on ASIC_AFS_AUTH_REP used to return all ~360k
+    rows, blowing any agent's context window. With v0.1.1+ it caps at
+    `limit` (default 50) and surfaces the original count in `truncated_at`.
+    """
+    from datetime import datetime, timezone
+
+    from asic_mcp.models import DataResponse, Observation
+
+    # Fake a 1,000-row response from _get_data_impl
+    fake_records = [
+        Observation(value=float(i), dimensions={"licence_number": f"L{i:05d}"})
+        for i in range(1000)
+    ]
+    fake_resp = DataResponse(
+        dataset_id="ASIC_AFS_AUTH_REP",
+        dataset_name="ASIC AFS Authorised Representative Register",
+        records=fake_records,
+        row_count=1000,
+        retrieved_at=datetime.now(timezone.utc),
+        source_url="https://data.gov.au/example",
+    )
+
+    async def _fake_impl(*args, **kwargs):
+        return fake_resp
+
+    monkeypatch.setattr(server, "_get_data_impl", _fake_impl)
+
+    resp = await server.latest("ASIC_AFS_AUTH_REP", limit=50)
+    assert len(resp.records) == 50, "limit=50 should cap to 50 records"
+    assert resp.row_count == 50, "row_count should reflect the truncated count"
+    assert resp.truncated_at == 1000, "truncated_at preserves the original row count"
+
+
+@pytest.mark.asyncio
+async def test_latest_no_truncation_when_under_limit(monkeypatch):
+    """If the underlying response fits under `limit`, no truncation
+    happens and `truncated_at` stays None."""
+    from datetime import datetime, timezone
+
+    from asic_mcp.models import DataResponse, Observation
+
+    small_resp = DataResponse(
+        dataset_id="ASIC_LIQUIDATOR",
+        dataset_name="ASIC Liquidator Register",
+        records=[Observation(value=float(i), dimensions={"id": str(i)}) for i in range(10)],
+        row_count=10,
+        retrieved_at=datetime.now(timezone.utc),
+        source_url="https://data.gov.au/example",
+    )
+
+    async def _fake_impl(*args, **kwargs):
+        return small_resp
+
+    monkeypatch.setattr(server, "_get_data_impl", _fake_impl)
+
+    resp = await server.latest("ASIC_LIQUIDATOR", limit=50)
+    assert len(resp.records) == 10, "10 records, limit=50, no truncation"
+    assert resp.truncated_at is None, "truncated_at is None when no truncation occurred"
+
+
+# Note on bounds: `limit` ge=1/le=10000 is enforced by FastMCP/Pydantic at the
+# MCP protocol boundary — not when calling the function directly from Python.
+# The truncation logic above is what asic-mcp owns and is exercised by the two
+# preceding tests. Boundary behaviour is the framework's contract, not ours.

@@ -5,6 +5,38 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.1] — 2026-05-13
+
+Bugfix release — closes the only customer-facing UX footgun surfaced by a
+portfolio-wide live smoke test.
+
+### Fixed — `latest()` on large registers no longer bombs agent context
+
+Calling `latest("ASIC_AFS_AUTH_REP")` (or any large register) used to dump
+**all ~360,000 rows** in a single response. ASIC registers are flat snapshots
+of every authorised entity, not time series — so the existing `last_n=1`
+indirection was meaningless and the full register flowed through unfiltered.
+Any agent calling this without filters would blow its context window.
+
+**Fix**: `latest()` gains a new `limit: int = 50` parameter (Pydantic-bounded
+to `[1, 10000]`). The response is sliced to `limit` records; if truncation
+happened, the original row count is preserved in `DataResponse.truncated_at`
+so an agent can detect it and either widen the limit or add more filters.
+
+For precise lookups (e.g. `filters={"adviser_number": "1234567"}`) the
+result already fits well under the cap and no truncation occurs —
+`truncated_at` stays None.
+
+### Added
+
+- `DataResponse.truncated_at: int | None` — set to the original row count
+  when `latest()` capped the response. None otherwise.
+- 2 regression tests in `test_server_validation.py`:
+  - 1,000-row fake response capped to 50 with `truncated_at=1000`
+  - 10-row response passes through unchanged with `truncated_at=None`
+
+231 unit tests now (was 229).
+
 ## [0.1.0] — 2026-05-13
 
 Initial release. ASIC registers via data.gov.au, plain-English access.

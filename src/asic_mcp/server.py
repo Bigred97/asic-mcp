@@ -520,26 +520,58 @@ async def latest(
             ],
         ),
     ] = None,
+    limit: Annotated[
+        int,
+        Field(
+            description=(
+                "Maximum rows to return. ASIC registers can be huge — "
+                "ASIC_AFS_AUTH_REP alone has ~360,000 rows. Without a cap the "
+                "response blows an agent's context window. Pass filters to "
+                "narrow the search; raise `limit` only if you genuinely need "
+                "a bulk dump. Truncated responses set DataResponse.truncated_at "
+                "to the original row count so agents can detect + surface it."
+            ),
+            ge=1,
+            le=10000,
+            examples=[50, 100, 500],
+        ),
+    ] = 50,
 ) -> DataResponse:
     """Return the most recent observation(s) per measure for a dataset.
 
-    For register data, "latest" is the current weekly/monthly snapshot. For
-    time-bounded fields (date_banned, date_ceased), latest returns the most
-    recent matching record per entity.
+    For register data, "latest" is the current weekly/monthly snapshot
+    capped at `limit` rows (default 50). For time-bounded fields
+    (date_banned, date_ceased), latest returns the most recent matching
+    record per entity.
+
+    Pass `filters` to drill into one entity (no truncation hits) or raise
+    `limit` to request more rows.
 
     Examples:
-        # Current registered status for one adviser
+        # Current registered status for one adviser (precise filter, no truncation)
         resp = await latest(
             "ASIC_FINANCIAL_ADVISERS",
             filters={"adviser_number": "1234567"},
         )
 
-        # Most-recently-banned person
+        # First 50 most-recent banned persons (truncated; full count in resp.truncated_at)
         resp = await latest("ASIC_BANNED_PERSONS")
+
+        # Get 500 rows in one go (still capped, but bigger window)
+        resp = await latest("ASIC_AFS_LICENSEE", limit=500)
     """
-    return await _get_data_impl(
+    resp = await _get_data_impl(
         dataset_id, filters, None, None, "records", last_n=1
     )
+    # Cap the response so a 360k-row register doesn't bomb the agent's
+    # context. Surface the original count via truncated_at so the agent
+    # knows to add filters or raise limit if they really wanted more.
+    original = len(resp.records)
+    if original > limit:
+        resp.records = resp.records[:limit]
+        resp.row_count = limit
+        resp.truncated_at = original
+    return resp
 
 
 @mcp.tool

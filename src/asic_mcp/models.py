@@ -95,6 +95,11 @@ class DataResponse(BaseModel):
     # should surface this to end-users when stale=True.
     stale: bool = False
     stale_reason: str | None = None
+    # Set when `latest()` truncated a large register response to the `limit`
+    # default. Original row count goes here; the truncation prevents
+    # 100k+ rows from blowing an agent's context window. Agents should
+    # surface this so users know to add filters or pass a larger `limit`.
+    truncated_at: int | None = None
 
 
 def _get_server_version() -> str:
