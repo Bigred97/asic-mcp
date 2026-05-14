@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.1.2] — 2026-05-15
+
+Reliability release — closes CLAUDE.md quality dimension #4 (Reliability +
+Caching) by adding graceful degradation when data.gov.au is unreachable.
+
+### Fixed — fall back to stale cache on upstream failure
+
+Previously, any data.gov.au 5xx / DNS failure / connection refused broke the
+tool with a raised `ASICAPIError`, even if a cached payload existed in the
+local SQLite cache. Agents using the tool mid-conversation would lose the
+thread when ASIC's CDN had a hiccup.
+
+Now the client falls back to the most-recent cached payload (regardless of
+TTL) when upstream is unreachable, and surfaces the staleness on the
+existing `DataResponse.stale` / `stale_reason` fields:
+
+```
+DataResponse.stale         = True
+DataResponse.stale_reason  = "ASIC dataset fetch returned 503 for {url};
+                              serving cached payload from ~17 minute(s) ago"
+```
+
+Empty-cache case still raises `ASICAPIError` — only degrade gracefully when
+there's something to degrade to. This is especially important for ASIC's
+large registers (the AFS Authorised Representatives CSV is ~50 MB) where a
+single re-fetch would otherwise time out the conversation.
+
+### Added
+
+- `Cache.get_stale(key)` — returns `(payload, cached_at_epoch)` regardless
+  of TTL, with the same mid-session corruption recovery as `get()`.
+- `client._stale_signal` `ContextVar` + `reset_stale_signal()` /
+  `get_stale_signal()` helpers — concurrent MCP tool calls each see their
+  own staleness state.
+- `server._get_data_impl` now resets the signal on entry and copies the
+  stale flag + reason onto the `DataResponse` after `build_response`.
+- 4 regression tests in new `tests/test_client.py`:
+  - 5xx fallback serves cached payload and marks stale
+  - `RequestError` (DNS / connection refused) fallback path
+  - empty-cache + 5xx still raises (preserves original behaviour)
+  - `Cache.get_stale` TTL-bypass building block
+
+### Tests
+
+235 unit tests now (was 231); 10× zero-flake gauntlet.
+
 ## [0.1.1] — 2026-05-13
 
 Bugfix release — closes the only customer-facing UX footgun surfaced by a
