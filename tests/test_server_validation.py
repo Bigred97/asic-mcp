@@ -115,7 +115,7 @@ async def test_latest_truncates_large_response_to_limit(monkeypatch):
     rows, blowing any agent's context window. With v0.1.1+ it caps at
     `limit` (default 50) and surfaces the original count in `truncated_at`.
     """
-    from datetime import datetime, timezone
+    from datetime import UTC, datetime
 
     from asic_mcp.models import DataResponse, Observation
 
@@ -129,7 +129,7 @@ async def test_latest_truncates_large_response_to_limit(monkeypatch):
         dataset_name="ASIC AFS Authorised Representative Register",
         records=fake_records,
         row_count=1000,
-        retrieved_at=datetime.now(timezone.utc),
+        retrieved_at=datetime.now(UTC),
         source_url="https://data.gov.au/example",
     )
 
@@ -148,7 +148,7 @@ async def test_latest_truncates_large_response_to_limit(monkeypatch):
 async def test_latest_no_truncation_when_under_limit(monkeypatch):
     """If the underlying response fits under `limit`, no truncation
     happens and `truncated_at` stays None."""
-    from datetime import datetime, timezone
+    from datetime import UTC, datetime
 
     from asic_mcp.models import DataResponse, Observation
 
@@ -157,7 +157,7 @@ async def test_latest_no_truncation_when_under_limit(monkeypatch):
         dataset_name="ASIC Liquidator Register",
         records=[Observation(value=float(i), dimensions={"id": str(i)}) for i in range(10)],
         row_count=10,
-        retrieved_at=datetime.now(timezone.utc),
+        retrieved_at=datetime.now(UTC),
         source_url="https://data.gov.au/example",
     )
 
