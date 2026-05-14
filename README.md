@@ -1,9 +1,10 @@
 # asic-mcp
 
-[![tests](https://github.com/Bigred97/asic-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/Bigred97/asic-mcp/actions/workflows/test.yml)
 [![PyPI](https://img.shields.io/pypi/v/asic-mcp.svg)](https://pypi.org/project/asic-mcp/)
 [![Python](https://img.shields.io/pypi/pyversions/asic-mcp.svg)](https://pypi.org/project/asic-mcp/)
-[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
+[![License](https://img.shields.io/pypi/l/asic-mcp.svg)](https://github.com/Bigred97/asic-mcp/blob/main/LICENSE)
+[![Tests](https://github.com/Bigred97/asic-mcp/actions/workflows/test.yml/badge.svg)](https://github.com/Bigred97/asic-mcp/actions/workflows/test.yml)
+[![CodeQL](https://github.com/Bigred97/asic-mcp/actions/workflows/codeql.yml/badge.svg)](https://github.com/Bigred97/asic-mcp/actions/workflows/codeql.yml)
 [![Glama MCP server quality](https://glama.ai/mcp/servers/Bigred97/asic-mcp/badges/score.svg)](https://glama.ai/mcp/servers/Bigred97/asic-mcp)
 
 **MCP server for Australian Securities and Investments Commission registers.** Plain-English access to the Financial Advisers Register, AFS Licensees, AFS Authorised Representatives, Credit Licensees, Banned & Disqualified Persons and Organisations, and Registered Liquidators — every one updated weekly by ASIC and served via data.gov.au.
@@ -125,17 +126,20 @@ Source: **Australian Securities and Investments Commission**, licensed under [Cr
 
 ---
 
-## Sister packages
+## Sister MCPs (Australian Public Data portfolio)
 
-- [abs-mcp](https://github.com/Bigred97/abs-mcp) — Australian Bureau of Statistics (CPI, GDP, labour force, population)
-- [rba-mcp](https://github.com/Bigred97/rba-mcp) — Reserve Bank of Australia (cash rate, FX rates, monetary aggregates)
-- [ato-mcp](https://github.com/Bigred97/ato-mcp) — Australian Taxation Office (Taxation Statistics, ACNC charity register, tax gaps)
-- [apra-mcp](https://github.com/Bigred97/apra-mcp) — Australian Prudential Regulation Authority (ADI / insurance / super statistics)
-- [aihw-mcp](https://github.com/Bigred97/aihw-mcp) — Australian Institute of Health and Welfare (causes of death, cancer, health expenditure)
+- [abs-mcp](https://pypi.org/project/abs-mcp/) — Australian Bureau of Statistics (CPI, unemployment, ERP, building approvals)
+- [rba-mcp](https://pypi.org/project/rba-mcp/) — Reserve Bank of Australia (cash rate, lending stats, exchange rates)
+- [ato-mcp](https://pypi.org/project/ato-mcp/) — Australian Taxation Office (tax stats, ACNC charities)
+- [apra-mcp](https://pypi.org/project/apra-mcp/) — Australian Prudential Regulation Authority (banking, insurance, super)
+- [aihw-mcp](https://pypi.org/project/aihw-mcp/) — Australian Institute of Health and Welfare
 - **asic-mcp** — this one. Financial advisers, AFS / credit licensees, banned persons & orgs, liquidators.
-- [au-weather-mcp](https://github.com/Bigred97/au-weather-mcp) — Australian weather via Open-Meteo + BOM
+- [aemo-mcp](https://pypi.org/project/aemo-mcp/) — Australian Energy Market Operator (NEM dispatch, spot prices, generation)
+- [au-weather-mcp](https://pypi.org/project/au-weather-mcp/) — Open-Meteo (Bureau of Meteorology aggregator)
+- [wgea-mcp](https://pypi.org/project/wgea-mcp/) — Workplace Gender Equality Agency
+- [aus-identity](https://pypi.org/project/aus-identity/) — Postcode / state / ABN normalisation helper used by all sisters
 
-All seven are designed to compose: an agent can ask for "current financial adviser in postcode 2000, paired with the AFS licensee's parent firm and the regulator's banning history" and one shot fans out across two or three MCPs.
+The portfolio is designed to compose: an agent can ask for "current financial adviser in postcode 2000, paired with the AFS licensee's parent firm and the regulator's banning history" and one shot fans out across two or three MCPs.
 
 ---
 

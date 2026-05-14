@@ -10,7 +10,12 @@ readme = "README.md"
 requires-python = ">=3.11"
 license = { text = "MIT" }
 authors = [{ name = "Harry Vass" }]
-keywords = ["mcp", "asic", "australia", "financial-advisers", "afs-licensee", "credit-licensee", "registers", "claude", "fastmcp", "fintech", "regtech", "compliance"]
+keywords = [
+    "mcp", "model-context-protocol", "claude", "fastmcp",
+    "asic", "financial-advisers", "afs-licensee", "credit-licensee", "registers",
+    "australia", "australian", "public-data", "government-data", "data-gov-au",
+    "fintech", "regtech", "compliance",
+]
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
@@ -46,7 +51,11 @@ asic-mcp = "asic_mcp.server:main"
 
 [project.urls]
 Homepage = "https://github.com/Bigred97/asic-mcp"
+Documentation = "https://github.com/Bigred97/asic-mcp#readme"
+Repository = "https://github.com/Bigred97/asic-mcp"
 Issues = "https://github.com/Bigred97/asic-mcp/issues"
+Changelog = "https://github.com/Bigred97/asic-mcp/blob/main/CHANGELOG.md"
+PyPI = "https://pypi.org/project/asic-mcp/"
 
 [tool.hatch.build.targets.wheel]
 packages = ["src/asic_mcp"]
