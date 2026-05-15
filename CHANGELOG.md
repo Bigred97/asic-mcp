@@ -5,6 +5,13 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.1] - 2026-05-16
+
+### Fixed
+
+- `test_live_list_curated_round_trip` updated to expect 11 datasets (was 7).
+- CLAUDE.md curated dataset list updated to all 11 ASIC registers.
+
 ## [0.4.0] - 2026-05-16
 
 ### Added

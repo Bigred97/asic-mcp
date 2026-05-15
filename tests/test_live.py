@@ -118,7 +118,7 @@ async def test_live_latest_returns_one_per_measure():
 async def test_live_list_curated_round_trip():
     """list_curated() then describe each — none should fail in production."""
     ids = server.list_curated()
-    assert len(ids) == 7
+    assert len(ids) == 11
     for dataset_id in ids:
         d = await server.describe_dataset(dataset_id)
         assert d.id == dataset_id
