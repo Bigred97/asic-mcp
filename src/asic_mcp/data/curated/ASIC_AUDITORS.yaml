@@ -1,0 +1,113 @@
+id: ASIC_AUDITORS
+name: ASIC Registered Auditor Register
+description: |
+  Every auditor registered with ASIC to sign audit opinions on financial
+  reports of Australian companies. Updated weekly via data.gov.au. Use this
+  to verify an auditor's registration status, look up their ASIC registration
+  number, check for suspensions, or find auditors in a state or territory.
+
+  Source: ASIC Registered Auditor Dataset, distributed via data.gov.au
+  under Creative Commons Attribution 3.0 Australia (CC BY 3.0 AU).
+period_coverage: current snapshot (weekly)
+update_frequency: weekly
+source_url: https://data.gov.au/data/dataset/asic-registered-auditor
+download_url: https://data.gov.au/data/dataset/4117fdec-3eff-44a1-9b78-869f7ec5c409/resource/0f2e41ec-6f49-4d35-8e6d-ebcd4a0e3e27/download/reg_auditor_202605.csv
+discovery:
+  package_id: asic-registered-auditor
+  resource_name: Registered Auditor Dataset - Current
+format: csv
+header_row: 1
+layout: wide
+cache_kind: register
+search_keywords:
+  - registered auditor
+  - asic auditor
+  - company auditor
+  - audit registration
+  - auditor lookup
+  - auditor status
+  - rca
+  - registered company auditor
+  - auditor suspended
+columns:
+  register_name:
+    source_column: REGISTER_NAME
+    description: Always "Registered Auditor". Constant.
+    role: dimension
+    dtype: string
+  auditor_number:
+    source_column: REG_AUD_NUM
+    description: ASIC registered auditor number.
+    role: id
+    dtype: string
+  auditor_name:
+    source_column: REG_AUD_NAME
+    description: Legal name of the registered auditor. Substring match supported.
+    role: id
+    dtype: string
+  acn:
+    source_column: REG_AUD_ACN
+    description: ACN of the auditor (where the auditor is a company rather than individual).
+    role: id
+    dtype: string
+  registration_date:
+    source_column: REG_AUD_START_DT
+    description: Date ASIC registration commenced (DD/MM/YYYY).
+    role: dimension
+    dtype: string
+  current_status:
+    source_column: REG_AUD_STATUS
+    description: Current status — REGD (registered), CANC (cancelled), SUSP (suspended).
+    role: dimension
+    dtype: string
+  suspension_date:
+    source_column: REG_AUD_SUSP_DT
+    description: Date of suspension, if applicable (DD/MM/YYYY).
+    role: dimension
+    dtype: string
+  locality:
+    source_column: REG_AUD_ADD_LOCAL
+    description: Suburb/town of the auditor's registered address.
+    role: dimension
+    dtype: string
+  state:
+    source_column: REG_AUD_ADD_STATE
+    description: State or territory of the auditor's registered address.
+    role: dimension
+    dtype: string
+  postcode:
+    source_column: REG_AUD_ADD_PCODE
+    description: Postcode of the registered address.
+    role: dimension
+    dtype: string
+  country:
+    source_column: REG_AUD_ADD_COUNTRY
+    description: Country of the registered address (AUS for Australian auditors).
+    role: dimension
+    dtype: string
+dimension_values:
+  state:
+    nsw: NSW
+    vic: VIC
+    qld: QLD
+    sa: SA
+    wa: WA
+    tas: TAS
+    nt: NT
+    act: ACT
+    NSW: NSW
+    VIC: VIC
+    QLD: QLD
+    SA: SA
+    WA: WA
+    TAS: TAS
+    NT: NT
+    ACT: ACT
+  current_status:
+    registered: REGD
+    active: REGD
+    cancelled: CANC
+    suspended: SUSP
+    REGD: REGD
+    CANC: CANC
+    SUSP: SUSP

@@ -1,0 +1,97 @@
+id: ASIC_BUSINESS_NAMES
+name: ASIC Business Names Register
+description: |
+  Every business name registered in Australia, maintained by ASIC and updated
+  weekly via data.gov.au. Business names are the trading names used by sole
+  traders, partnerships, companies, and other entities — distinct from company
+  names. Use this to look up who holds a business name, check registration
+  status, or find all business names linked to an ABN.
+
+  Source: ASIC Business Names Dataset, distributed via data.gov.au under
+  Creative Commons Attribution 3.0 Australia (CC BY 3.0 AU).
+period_coverage: current snapshot (weekly)
+update_frequency: weekly
+source_url: https://data.gov.au/data/dataset/asic-business-names
+download_url: https://data.gov.au/data/dataset/bc515135-4bb6-4d50-957a-3713709a76d3/resource/55ad4b1c-5eeb-44ea-8b29-d410da431be3/download/business_names_202605.csv
+discovery:
+  package_id: asic-business-names
+  resource_name: Business Names Dataset - Current
+format: csv
+header_row: 1
+layout: wide
+cache_kind: register
+search_keywords:
+  - business name
+  - trading name
+  - registered business name
+  - business name lookup
+  - business name abn
+  - business name status
+  - sole trader name
+  - trading as
+  - dba
+columns:
+  register_name:
+    source_column: REGISTER_NAME
+    description: Always "Business Names". Constant.
+    role: dimension
+    dtype: string
+  business_name:
+    source_column: BN_NAME
+    description: The registered business (trading) name. Substring match supported.
+    role: id
+    dtype: string
+  status:
+    source_column: BN_STATUS
+    description: Registration status — Registered or Cancelled.
+    role: dimension
+    dtype: string
+  registration_date:
+    source_column: BN_REG_DT
+    description: Date the business name was registered (DD/MM/YYYY).
+    role: dimension
+    dtype: string
+  cancellation_date:
+    source_column: BN_CANCEL_DT
+    description: Date the business name was cancelled (DD/MM/YYYY); blank if active.
+    role: dimension
+    dtype: string
+  state_number:
+    source_column: BN_STATE_NUM
+    description: State registration number for the business name.
+    role: id
+    dtype: string
+  state:
+    source_column: BN_STATE_OF_REG
+    description: Australian state or territory where the business name is registered.
+    role: dimension
+    dtype: string
+  abn:
+    source_column: BN_ABN
+    description: ABN of the entity that holds this business name.
+    role: id
+    dtype: string
+dimension_values:
+  state:
+    nsw: NSW
+    vic: VIC
+    qld: QLD
+    sa: SA
+    wa: WA
+    tas: TAS
+    nt: NT
+    act: ACT
+    NSW: NSW
+    VIC: VIC
+    QLD: QLD
+    SA: SA
+    WA: WA
+    TAS: TAS
+    NT: NT
+    ACT: ACT
+  status:
+    registered: Registered
+    active: Registered
+    cancelled: Cancelled
+    Registered: Registered
+    Cancelled: Cancelled

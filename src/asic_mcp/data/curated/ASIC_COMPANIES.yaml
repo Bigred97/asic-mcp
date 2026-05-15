@@ -1,0 +1,107 @@
+id: ASIC_COMPANIES
+name: ASIC Company Register
+description: |
+  Every company registered in Australia — public, proprietary, foreign, and
+  specialised entities — maintained by ASIC and updated weekly via data.gov.au.
+  Over 3.5 million records. Use this to verify a company's registration status,
+  look up ACN/ABN, check company type, or confirm when a company was
+  incorporated or deregistered.
+
+  Source: ASIC Company Dataset, distributed via data.gov.au under Creative
+  Commons Attribution 3.0 Australia (CC BY 3.0 AU).
+period_coverage: current snapshot (weekly)
+update_frequency: weekly
+source_url: https://data.gov.au/data/dataset/asic-companies
+download_url: https://data.gov.au/data/dataset/7b8656f9-606d-4337-af29-66b89b2eeefb/resource/5c3914e6-413e-4a2c-b890-bf8efe3eabf2/download/company_202605.csv
+discovery:
+  package_id: asic-companies
+  resource_name: Company Dataset - Current
+format: csv
+header_row: 1
+layout: wide
+cache_kind: register
+search_keywords:
+  - company register
+  - acn
+  - company search
+  - company lookup
+  - registered company
+  - company status
+  - company type
+  - proprietary company
+  - public company
+  - incorporated company
+  - company abn
+  - pty ltd
+  - company deregistered
+columns:
+  company_name:
+    source_column: Company Name
+    description: Registered legal name of the company.
+    role: id
+    dtype: string
+  acn:
+    source_column: ACN
+    description: Australian Company Number — 9-digit unique identifier issued by ASIC.
+    role: id
+    dtype: string
+  type:
+    source_column: Type
+    description: Company type code (e.g. APTY = Australian Proprietary, APUB = Australian Public).
+    role: dimension
+    dtype: string
+  class:
+    source_column: Class
+    description: Class of company (e.g. Limited by Shares, Unlimited, No Liability).
+    role: dimension
+    dtype: string
+  sub_class:
+    source_column: Sub Class
+    description: Sub-class of company where applicable.
+    role: dimension
+    dtype: string
+  status:
+    source_column: Status
+    description: Registration status — REGD (Registered), DRGD (Deregistered), etc.
+    role: dimension
+    dtype: string
+  registration_date:
+    source_column: Date of Registration
+    description: Date the company was first registered with ASIC (DD/MM/YYYY).
+    role: dimension
+    dtype: string
+  deregistration_date:
+    source_column: Date of Deregistration
+    description: Date the company was deregistered (DD/MM/YYYY); blank if still registered.
+    role: dimension
+    dtype: string
+  state_of_registration:
+    source_column: Previous State of Registration
+    description: Australian state where the company was originally registered (pre-national corporations law).
+    role: dimension
+    dtype: string
+  abn:
+    source_column: ABN
+    description: Australian Business Number — 11-digit identifier (blank for many companies).
+    role: id
+    dtype: string
+  current_name:
+    source_column: Current Name
+    description: Current registered name if different from original name.
+    role: id
+    dtype: string
+dimension_values:
+  status:
+    registered: REGD
+    active: REGD
+    deregistered: DRGD
+    REGD: REGD
+    DRGD: DRGD
+  type:
+    proprietary: APTY
+    pty: APTY
+    public: APUB
+    foreign: RFCD
+    APTY: APTY
+    APUB: APUB
+    RFCD: RFCD

@@ -104,7 +104,7 @@ def test_list_curated_returns_sorted_ids():
     assert ids == sorted(ids)
     assert "ASIC_FINANCIAL_ADVISERS" in ids
     assert "ASIC_BANNED_PERSONS" in ids
-    assert len(ids) == 7
+    assert len(ids) == 11
 
 
 # --- Int-year coercion (Wave 1 interop fix) ----------------------------------

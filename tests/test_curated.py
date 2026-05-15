@@ -112,8 +112,12 @@ def test_state_dimension_consistent_across_datasets():
 
 
 def test_register_name_is_constant_column_in_every_dataset():
-    """Every ASIC register CSV has a REGISTER_NAME column we expose as register_name."""
+    """Most ASIC register CSVs have a REGISTER_NAME column we expose as register_name.
+    Exception: ASIC_COMPANIES uses a different CSV schema without REGISTER_NAME."""
+    no_register_name = {"ASIC_COMPANIES"}
     for cd in curated.list_all():
+        if cd.id in no_register_name:
+            continue
         assert "register_name" in cd.columns, (
             f"{cd.id} missing register_name column"
         )

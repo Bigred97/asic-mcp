@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.4.0] - 2026-05-16
+
+### Added
+
+- **4 new curated ASIC registers** — expands from 7 to 11 datasets:
+  - `ASIC_COMPANIES`: full Australian company register (~3.5M records), weekly
+  - `ASIC_BUSINESS_NAMES`: registered trading names linked to ABN, weekly
+  - `ASIC_CREDIT_REPRESENTATIVE`: mortgage/finance brokers authorised under
+    ACL holders (CRED_REP_NUM, CRED_LIC_NUM, authorisations, state), weekly
+  - `ASIC_AUDITORS`: registered company auditors with status and address, weekly
+
 ## [0.3.1] - 2026-05-15
 
 ### Fixed

@@ -1,0 +1,117 @@
+id: ASIC_CREDIT_REPRESENTATIVE
+name: ASIC Credit Representative Register
+description: |
+  Every representative authorised to engage in credit activities on behalf
+  of an Australian Credit Licensee (ACL) holder — mortgage brokers, finance
+  brokers, and other credit intermediaries. Updated weekly via data.gov.au.
+  Use this to verify whether an individual or firm is authorised to act as a
+  credit representative, identify their appointing licensee, or check the
+  scope of their authorisations.
+
+  Source: ASIC Credit Representative Dataset, distributed via data.gov.au
+  under Creative Commons Attribution 3.0 Australia (CC BY 3.0 AU).
+period_coverage: current snapshot (weekly)
+update_frequency: weekly
+source_url: https://data.gov.au/data/dataset/asic-credit-representative
+download_url: https://data.gov.au/data/dataset/a3b6d445-3a00-409a-8b49-53dc62b823bf/resource/999d9e92-df2c-4d6d-b580-321dcd205292/download/credit_rep_202605.csv
+discovery:
+  package_id: asic-credit-representative
+  resource_name: Credit Representative Dataset - Current
+format: csv
+header_row: 1
+layout: wide
+cache_kind: register
+search_keywords:
+  - credit representative
+  - credit rep
+  - mortgage broker
+  - finance broker
+  - credit intermediary
+  - authorised representative credit
+  - nccp representative
+  - credit activities
+  - credit authorisation
+columns:
+  register_name:
+    source_column: REGISTER_NAME
+    description: Always "Credit Representative". Constant.
+    role: dimension
+    dtype: string
+  rep_number:
+    source_column: CRED_REP_NUM
+    description: ASIC credit representative number.
+    role: id
+    dtype: string
+  licensee_number:
+    source_column: CRED_LIC_NUM
+    description: Australian Credit Licence number of the appointing licensee.
+    role: id
+    dtype: string
+  rep_name:
+    source_column: CRED_REP_NAME
+    description: Legal name of the credit representative. Substring match supported.
+    role: id
+    dtype: string
+  abn_acn:
+    source_column: CRED_REP_ABN_ACN
+    description: ABN or ACN of the credit representative (where applicable).
+    role: dimension
+    dtype: string
+  start_date:
+    source_column: CRED_REP_START_DT
+    description: Date the credit representative appointment began (DD/MM/YYYY).
+    role: dimension
+    dtype: string
+  end_date:
+    source_column: CRED_REP_END_DT
+    description: Date the appointment ended (DD/MM/YYYY); blank if current.
+    role: dimension
+    dtype: string
+  locality:
+    source_column: CRED_REP_LOCALITY
+    description: Suburb/town of the representative's registered address.
+    role: dimension
+    dtype: string
+  state:
+    source_column: CRED_REP_STATE
+    description: State or territory of the representative's registered address.
+    role: dimension
+    dtype: string
+  postcode:
+    source_column: CRED_REP_PCODE
+    description: Postcode of the registered address.
+    role: dimension
+    dtype: string
+  edrs:
+    source_column: CRED_REP_EDRS
+    description: External Dispute Resolution scheme membership (e.g. "AFCA").
+    role: dimension
+    dtype: string
+  authorisations:
+    source_column: CRED_REP_AUTHORISATIONS
+    description: Credit activities the representative is authorised to carry out.
+    role: dimension
+    dtype: string
+  cross_endorsement:
+    source_column: CRED_REP_CROSS_ENDORSE
+    description: Cross-endorsement details where the representative holds authorisations from multiple licensees.
+    role: dimension
+    dtype: string
+dimension_values:
+  state:
+    nsw: NSW
+    vic: VIC
+    qld: QLD
+    sa: SA
+    wa: WA
+    tas: TAS
+    nt: NT
+    act: ACT
+    NSW: NSW
+    VIC: VIC
+    QLD: QLD
+    SA: SA
+    WA: WA
+    TAS: TAS
+    NT: NT
+    ACT: ACT
