@@ -35,6 +35,12 @@ Repo-specific extras:
 - **Registers are flat snapshots, NOT time series.** `latest()` would have dumped 359k+ rows by default; v0.1.1+ caps via `limit=50` with `DataResponse.truncated_at` preserving original count.
 - Updated weekly by ASIC. `stale` threshold is 14 days for these registers.
 - Always pass filters (`licensee_name`, `adviser_number`, `current_status`) when possible — full-register dumps are last-resort.
+- **`top_n` is intentionally absent.** ASIC registers are flat entity snapshots
+  (one row per licensee/adviser/banned-person). They don't have a numeric measure
+  to rank by; "top 10 financial advisers" isn't a meaningful query. The
+  `latest(... limit=N)` parameter already serves the "give me the first N rows
+  matching these filters" use case. If a downstream caller wants alphabetical
+  ranking, they can sort the records client-side.
 
 ---
 
