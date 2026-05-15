@@ -136,3 +136,30 @@ def test_read_csv_sniff_handles_more_tabs_than_commas(financial_advisers_csv):
     df = read_csv(financial_advisers_csv)
     # Tab-sniffed correctly → many columns. Comma-sniffed wrongly → 1 column.
     assert len(df.columns) > 5
+
+
+def test_decode_handles_windows_1252_bytes():
+    """ASIC has been known to ship Windows-1252 bytes (e.g. a copyright
+    symbol) inside a .csv file. The fallback chain must decode those
+    cleanly rather than raising UnicodeDecodeError."""
+    # Header line ASCII, body row contains 0xa9 (the windows-1252 copyright
+    # symbol). 0xa9 is not a valid UTF-8 leading byte, so a strict utf-8
+    # decode raises — the fallback chain must catch and retry.
+    body = b"REGISTER_NAME,NOTE\nBanned Org,Copyright \xa9 ASIC\nOther Org,plain ascii\n"
+    # Sanity: these bytes are not valid UTF-8.
+    raised = False
+    try:
+        body.decode("utf-8")
+    except UnicodeDecodeError:
+        raised = True
+    assert raised, "fixture bytes must not be valid UTF-8 for this test to be meaningful"
+
+    df = read_csv(body)
+    assert "REGISTER_NAME" in df.columns
+    assert "NOTE" in df.columns
+    assert len(df) == 2
+    # The copyright symbol should round-trip from the windows-1252 fallback.
+    notes = list(df["NOTE"])
+    assert any("\xa9" in str(n) for n in notes), (
+        f"expected the (c) character preserved in NOTE, got {notes!r}"
+    )

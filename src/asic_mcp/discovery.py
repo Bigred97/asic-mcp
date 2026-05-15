@@ -49,12 +49,17 @@ class DiscoverySpec:
         resource_name_pattern: regex match against `resource["name"]`.
             If multiple match, the one with the highest year (extracted
             from any 4-digit sequence in the name) wins.
+        resource_format: optional case-insensitive CKAN `format` filter
+            (e.g. "csv", "xlsx"). Required when a CKAN package publishes
+            the same resource name in multiple formats — without it, the
+            picker may pick XLSX bytes that then fail in a CSV reader.
     """
     package_id: str | None = None
     package_id_pattern: str | None = None
     organization_id: str | None = None
     resource_name: str | None = None
     resource_name_pattern: str | None = None
+    resource_format: str | None = None
 
 
 class DiscoveryError(Exception):
@@ -210,6 +215,7 @@ async def _resolve_latest_package_id(
 
 def _pick_resource(resources: list[dict[str, Any]], spec: DiscoverySpec) -> dict | None:
     """Return the best-matching resource dict, or None."""
+    want_format = (spec.resource_format or "").strip().lower() or None
     candidates: list[tuple[int, dict]] = []
     for res in resources:
         if not isinstance(res, dict):
@@ -217,6 +223,14 @@ def _pick_resource(resources: list[dict[str, Any]], spec: DiscoverySpec) -> dict
         name = res.get("name") or ""
         if not isinstance(name, str):
             continue
+        # When the spec pins a format, skip resources of any other format.
+        # CKAN can publish the same resource name as CSV, TSV, and XLSX side
+        # by side — without this filter the picker can return XLSX bytes for
+        # a curated dataset declared as `format: csv`.
+        if want_format is not None:
+            res_fmt = (res.get("format") or "").strip().lower()
+            if res_fmt != want_format:
+                continue
         if spec.resource_name is not None:
             if name == spec.resource_name:
                 candidates.append((_year_from_text(name) or 0, res))

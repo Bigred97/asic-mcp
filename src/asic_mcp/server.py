@@ -184,6 +184,11 @@ async def _resolve_download_url(cd: curated.CuratedDataset, client: ASICClient) 
             organization_id=cd.discovery.get("organization_id"),
             resource_name=cd.discovery.get("resource_name"),
             resource_name_pattern=cd.discovery.get("resource_name_pattern"),
+            # Default the format filter to the curated dataset's format so
+            # CKAN packages publishing multiple formats under the same name
+            # (CSV + TSV + XLSX) resolve to the one we know how to parse.
+            # YAML can override via discovery.resource_format if needed.
+            resource_format=cd.discovery.get("resource_format", cd.format),
         )
         return await resolve_latest_url(client, spec)
     except DiscoveryError:

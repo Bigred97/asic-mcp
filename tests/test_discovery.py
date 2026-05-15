@@ -69,6 +69,38 @@ def test_pick_resource_no_match_returns_none():
     assert _pick_resource(resources, spec) is None
 
 
+def test_pick_resource_filters_by_format_when_multiple_formats_share_a_name():
+    """ASIC Banned Organisations publishes the same resource name as CSV, TSV,
+    and XLSX side-by-side. Without a format filter, _pick_resource would
+    return whichever resource comes first — feeding XLSX bytes into the
+    CSV reader. With resource_format set, the right one wins."""
+    resources = [
+        {
+            "name": "Banned and Disqualified Organisations - Current",
+            "format": "XLSX",
+            "url": "https://data.gov.au/data/x/bd_org.xlsx",
+        },
+        {
+            "name": "Banned and Disqualified Organisations - Current",
+            "format": "CSV",
+            "url": "https://data.gov.au/data/x/bd_org.csv",
+        },
+        {
+            "name": "Banned and Disqualified Organisations - Current",
+            "format": "TSV",
+            "url": "https://data.gov.au/data/x/bd_org.tsv",
+        },
+    ]
+    spec = DiscoverySpec(
+        package_id="asic-banned-disqualified-org",
+        resource_name="Banned and Disqualified Organisations - Current",
+        resource_format="csv",
+    )
+    m = _pick_resource(resources, spec)
+    assert m is not None
+    assert m["url"].endswith(".csv")
+
+
 def test_pick_resource_skips_non_dict_entries():
     resources = [
         "not a dict",  # type: ignore[list-item]

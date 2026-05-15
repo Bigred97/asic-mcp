@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.3.1] - 2026-05-15
+
+### Fixed
+
+- `ASIC_BANNED_ORGS` UTF-8 decode error on a CKAN-resolved CSV. The package
+  publishes three resources with the same name "Banned and Disqualified
+  Organisations - Current" (CSV + TSV + XLSX); discovery was returning the
+  XLSX URL, whose ZIP-archive bytes then tripped the CSV decoder at byte 0xac.
+  Discovery now filters resources by the curated dataset's declared format,
+  so a `format: csv` dataset gets the CSV resource even when same-named
+  XLSX/TSV siblings are present. Added an encoding fallback chain
+  (utf-8 → windows-1252 → iso-8859-1) in `read_csv` as defence-in-depth
+  for any ASIC register that ever ships non-UTF-8 bytes inside a `.csv`.
+
 ## [0.3.0] — 2026-05-15
 
 ### Added — Wave 1 portfolio interoperability fix (int-year coercion)

@@ -119,37 +119,61 @@ def read_csv(body: bytes, *, encoding: str = "utf-8-sig") -> pd.DataFrame:
     to pandas' built-in C engine keeps parsing fast on the 50 MB advisers
     file (~1.5s vs ~6s for the Python engine with sep=None).
 
-    Files ship as UTF-8 with BOM and standard quoting. `low_memory=False`
+    Files mostly ship as UTF-8 with BOM, but ASIC has been known to ship
+    Windows-1252 / latin-1 bytes inside a `.csv` file (e.g. a stray smart
+    quote or copyright symbol). We try the caller's preferred encoding
+    first, then fall back through windows-1252 and iso-8859-1 — the latter
+    decodes any byte sequence without raising, so the fallback chain
+    always terminates with a successful decode attempt. `low_memory=False`
     prevents mixed-dtype columns (e.g. licence numbers with leading zeros)
     from being silently coerced partway through.
     """
     if not body:
         raise ParseError("empty CSV body")
 
-    # Sniff delimiter from the first non-empty header line.
-    sep = ","
-    try:
-        head = body[:4096].decode(encoding, errors="replace")
-        first_line = next((ln for ln in head.splitlines() if ln.strip()), "")
-        if first_line.count("\t") > first_line.count(","):
-            sep = "\t"
-    except Exception:
+    # Try the caller's preferred encoding first; fall back to common
+    # latin-family encodings when ASIC ships a non-UTF-8 file. iso-8859-1
+    # decodes any byte sequence, so the chain always terminates.
+    encodings_to_try = [encoding, "windows-1252", "iso-8859-1"]
+    # De-duplicate while preserving order in case the caller passed one of
+    # the fallback encodings explicitly.
+    seen: set[str] = set()
+    encodings_to_try = [
+        e for e in encodings_to_try if not (e in seen or seen.add(e))
+    ]
+
+    last_decode_error: UnicodeDecodeError | None = None
+    for enc in encodings_to_try:
+        # Sniff delimiter from the first non-empty header line.
         sep = ","
+        try:
+            head = body[:4096].decode(enc, errors="replace")
+            first_line = next((ln for ln in head.splitlines() if ln.strip()), "")
+            if first_line.count("\t") > first_line.count(","):
+                sep = "\t"
+        except Exception:
+            sep = ","
 
-    try:
-        df = pd.read_csv(
-            BytesIO(body),
-            encoding=encoding,
-            sep=sep,
-            low_memory=False,
-        )
-    except UnicodeDecodeError as e:
-        raise ParseError(f"CSV decode failed with encoding {encoding!r}: {e}") from e
-    except pd.errors.ParserError as e:
-        raise ParseError(f"CSV parse failed: {e}") from e
+        try:
+            df = pd.read_csv(
+                BytesIO(body),
+                encoding=enc,
+                sep=sep,
+                low_memory=False,
+            )
+        except UnicodeDecodeError as e:
+            last_decode_error = e
+            continue
+        except pd.errors.ParserError as e:
+            raise ParseError(f"CSV parse failed: {e}") from e
 
-    df.columns = [_normalize_header(c) for c in df.columns]
-    return df
+        df.columns = [_normalize_header(c) for c in df.columns]
+        return df
+
+    raise ParseError(
+        f"CSV decode failed with all attempted encodings "
+        f"({encodings_to_try!r}): {last_decode_error}"
+    ) from last_decode_error
 
 
 def drop_blank_rows(df: pd.DataFrame, key_columns: list[str]) -> pd.DataFrame:
