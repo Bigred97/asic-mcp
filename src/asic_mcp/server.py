@@ -215,14 +215,12 @@ async def _resolve_dated_url(cd: curated.CuratedDataset, client: ASICClient) -> 
     """
     assert cd.url_template is not None
     today = date.today()
-    last_err: Exception | None = None
     for delta in range(cd.url_template_lookback_days + 1):
         cand = today - timedelta(days=delta)
         url = cd.url_template.replace("{date:YYYYMMDD}", cand.strftime("%Y%m%d"))
         try:
             ok = await client.head_ok(url)
-        except Exception as e:  # network errors — fall through to next date
-            last_err = e
+        except Exception:  # network errors — fall through to next date
             continue
         if ok:
             return url

@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.1] - 2026-05-16
+
+### Fixed
+
+- Ruff lint failure in `_resolve_dated_url` — `last_err` variable was
+  assigned in the `except` branch but never read (F841). Removed.
+  No behaviour change.
+
 ## [0.5.0] - 2026-05-16
 
 ### Added — ASIC_SHORT_POSITIONS daily market data feed (Wave 3)
