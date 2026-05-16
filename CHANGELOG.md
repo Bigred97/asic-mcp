@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.1] - 2026-05-16
+
+### Changed
+
+- `_validate_filters` now accepts JSON-string filters (e.g. LLM clients
+  passing `filters='{"state":"nsw"}'` as a string) and decodes them
+  to dicts. Invalid JSON strings raise with a clear "filters must be a
+  JSON object, got invalid JSON string: ..." hint pointing at the
+  expected form.
+- Edge-input regex assertions broadened to match either "filters must
+  be a dict" (for non-string non-dict input) OR "filters must be a JSON
+  object" (for invalid JSON strings) — both are valid rejections.
+
 ## [0.6.0] - 2026-05-16
 
 ### Added — ASIC_SMSF_AUDITORS

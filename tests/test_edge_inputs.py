@@ -196,7 +196,11 @@ async def test_describe_every_curated_dataset():
     True,
 ])
 async def test_get_data_rejects_non_dict_filters(bad_filters):
-    with pytest.raises(ValueError, match="filters must be a dict"):
+    # String filters first try JSON-decode (added in 0.6.1+); invalid JSON
+    # raises "filters must be a JSON object" while non-string non-dict
+    # raises "filters must be a dict". Both are valid rejections — pattern
+    # matches either.
+    with pytest.raises(ValueError, match="filters must be (a dict|a JSON object)"):
         await server.get_data("ASIC_FINANCIAL_ADVISERS", filters=bad_filters)  # type: ignore[arg-type]
 
 
@@ -300,8 +304,10 @@ async def test_latest_unknown_dataset_raises():
 
 @pytest.mark.asyncio
 async def test_latest_passes_validation_through(mocked_client):
-    """latest() shares validation with get_data — confirm it fails the same way."""
-    with pytest.raises(ValueError, match="filters must be a dict"):
+    """latest() shares validation with get_data — confirm it fails the same way.
+    String filters first try JSON-decode (0.6.1+); invalid JSON raises
+    "filters must be a JSON object". Either rejection is acceptable."""
+    with pytest.raises(ValueError, match="filters must be (a dict|a JSON object)"):
         await server.latest("ASIC_FINANCIAL_ADVISERS", filters="bad")  # type: ignore[arg-type]
 
 
