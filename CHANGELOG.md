@@ -5,6 +5,44 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.0] - 2026-05-16
+
+### Added — ASIC_SMSF_AUDITORS
+
+- **`ASIC_SMSF_AUDITORS` curated dataset.** Every SMSF auditor
+  registered with ASIC under section 128A of the SIS Act 1993 —
+  ~5,000 unique auditors, ~30,000 rows (one row per
+  auditor × condition/attribute). Updated weekly via data.gov.au.
+- Columns: smsf_auditor_number, auditor_name, current_status,
+  abn, registration_date, suspension dates, locality, postcode,
+  state, attribute_type, capacity (Director/Partner/Sole
+  Practitioner/Employee), capacity_firm_name, condition + detail.
+- Closes a real gap for SMSF service providers, accounting firms
+  with SMSF audit practices, trustees searching for an auditor,
+  compliance teams, lawyers handling SMSF disputes.
+- Uses existing TSV-detection register parser (the file has a
+  `.csv` extension but is tab-delimited; the parser auto-detects).
+  Plus CKAN auto-discovery for weekly URL refresh.
+
+### Customer-value validation (live ASIC fetch, 2026-05-16)
+
+- SMSF service provider lookup: `latest('ASIC_SMSF_AUDITORS',
+  filters={'smsf_auditor_number':'100263447'})` returns 8 rows
+  (one per registration condition) for Benjamin Jenkins, NSW,
+  Registered.
+- NSW registered SMSF auditors: 1,618 unique auditors (of 13,072
+  total attribute rows).
+- Suspended SMSF auditors nationally: 1 unique auditor — useful
+  for compliance teams.
+- Search routing: "smsf auditor", "self managed super fund
+  auditor", "smsf compliance", "smsf audit" all hit
+  ASIC_SMSF_AUDITORS at #1.
+
+### Tests
+
+- 249 unit tests passing (was 249). 10× zero-flake gauntlet.
+- `test_list_curated_returns_sorted_ids` updated from 12 to 13.
+
 ## [0.5.1] - 2026-05-16
 
 ### Fixed

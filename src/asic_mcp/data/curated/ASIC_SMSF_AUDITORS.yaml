@@ -1,0 +1,162 @@
+id: ASIC_SMSF_AUDITORS
+name: ASIC Self-Managed Super Fund Auditor Register
+description: |
+  Every SMSF auditor registered with ASIC under section 128A of the
+  Superannuation Industry (Supervision) Act 1993. ~5,000 unique auditors;
+  one row per auditor per registered condition/attribute (so ~30,000 total
+  rows). Updated weekly via data.gov.au.
+
+  Use this to: verify an SMSF auditor's registration status before
+  engaging them, look up an auditor's SMSF auditor number, check for
+  suspensions, find SMSF auditors in a state/postcode, identify which
+  firm an auditor practices through (Director / Partner / Sole
+  Practitioner / Employee).
+
+  Customer audience: accounting firms with SMSF audit practices, SMSF
+  trustees searching for an auditor, compliance teams at SMSF service
+  providers, lawyers handling SMSF disputes, professional bodies
+  (CA ANZ, CPA Australia, IPA) verifying member registration.
+
+  Source: ASIC Self-Managed Super Fund Auditor Dataset, distributed via
+  data.gov.au under Creative Commons Attribution 3.0 Australia (CC BY
+  3.0 AU). Tab-delimited despite the .csv extension — the parser
+  auto-detects delimiter.
+period_coverage: current snapshot (weekly)
+update_frequency: weekly
+source_url: https://data.gov.au/data/dataset/asic-smsf
+download_url: https://data.gov.au/data/dataset/37390371-9da4-42d8-9304-649c50090611/resource/13b12e77-8fda-42ca-aa43-23715036836b/download/smsf_auditor_202604.csv
+discovery:
+  package_id: asic-smsf
+  resource_name: SMSF Auditor Dataset - Current
+format: csv
+header_row: 1
+layout: wide
+cache_kind: register
+search_keywords:
+  - smsf auditor
+  - self managed super fund auditor
+  - asic smsf
+  - smsf compliance
+  - smsf audit
+  - smsf register
+  - auditor verification
+  - sis act
+  - section 128a
+  - smsf number
+columns:
+  register_name:
+    source_column: REGISTER_NAME
+    description: Always "SMSF Auditor". Constant.
+    role: dimension
+    dtype: string
+  smsf_auditor_number:
+    source_column: SMSF_NUM
+    description: ASIC SMSF auditor number (unique per auditor).
+    role: id
+    dtype: string
+  auditor_name:
+    source_column: SMSF_NAME
+    description: Legal name of the registered SMSF auditor. Substring match supported.
+    role: id
+    dtype: string
+  current_status:
+    source_column: SMSF_STATUS
+    description: Current registration status — Registered, Suspended, Cancelled.
+    role: dimension
+    dtype: string
+  abn:
+    source_column: SMSF_PERSON_ABN
+    description: Auditor's individual ABN (may be blank).
+    role: id
+    dtype: string
+  registration_date:
+    source_column: SMSF_REG_DT
+    description: Date ASIC registration commenced (DD/MM/YYYY).
+    role: dimension
+    dtype: string
+  suspension_start:
+    source_column: SMSF_SUSP_START_DT
+    description: Suspension start date, if applicable (DD/MM/YYYY).
+    role: dimension
+    dtype: string
+  suspension_end:
+    source_column: SMSF_SUSP_END_DT
+    description: Suspension end date, if applicable (DD/MM/YYYY).
+    role: dimension
+    dtype: string
+  locality:
+    source_column: SMSF_LOCALITY
+    description: Suburb/town of the auditor's registered address.
+    role: dimension
+    dtype: string
+  postcode:
+    source_column: SMSF_POST_CODE
+    description: Postcode of the registered address.
+    role: dimension
+    dtype: string
+  state:
+    source_column: SMSF_STATE
+    description: State or territory of the auditor's registered address.
+    role: dimension
+    dtype: string
+  attribute_type:
+    source_column: SMSF_ATTRIBUTE_TYPE
+    description: Type of register row — typically "Condition" (a registration condition the auditor must meet) or details about the practising firm.
+    role: dimension
+    dtype: string
+  capacity:
+    source_column: SMSF_CAPACITY
+    description: Auditor's role at the firm (Director / Partner / Sole Practitioner / Employee).
+    role: dimension
+    dtype: string
+  capacity_firm_name:
+    source_column: SMSF_CAPACITY_FIRM_NAME
+    description: Name of the firm the auditor practises through.
+    role: id
+    dtype: string
+  capacity_start_date:
+    source_column: SMSF_CAPACITY_START_DT
+    description: Date the auditor commenced this capacity at the firm (DD/MM/YYYY).
+    role: dimension
+    dtype: string
+  condition:
+    source_column: SMSF_CONDITION
+    description: Short title of the registration condition (e.g. "Compliance with competency standards").
+    role: dimension
+    dtype: string
+  condition_detail:
+    source_column: SMSF_CONDITION_DTL
+    description: Full text of the registration condition.
+    role: dimension
+    dtype: string
+  condition_start_date:
+    source_column: SMSF_CONDITION_START_DT
+    description: Date the condition commenced (DD/MM/YYYY).
+    role: dimension
+    dtype: string
+dimension_values:
+  state:
+    nsw: NSW
+    vic: VIC
+    qld: QLD
+    sa: SA
+    wa: WA
+    tas: TAS
+    nt: NT
+    act: ACT
+    NSW: NSW
+    VIC: VIC
+    QLD: QLD
+    SA: SA
+    WA: WA
+    TAS: TAS
+    NT: NT
+    ACT: ACT
+  current_status:
+    registered: Registered
+    active: Registered
+    suspended: Suspended
+    cancelled: Cancelled
+    Registered: Registered
+    Suspended: Suspended
+    Cancelled: Cancelled
