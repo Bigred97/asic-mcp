@@ -31,6 +31,38 @@ from .curated import (
 )
 from .models import DataResponse, Observation
 
+# Per-dataset bloat-trim rules for free-text fields whose source values run
+# multiple KB per record (license boilerplate, ban conditions, etc.). Without
+# truncation a single ASIC_AFS_LICENSEE record can run 2-3 KB just for the
+# `authorisation` field, blowing the portfolio's <10k-token response budget
+# on the very first row. Callers who genuinely need the full text opt in via
+# the tool-level `include_full_authorisation=True` kwarg, which propagates
+# through `_get_data_impl` into this module's `build_response`.
+_AUTHORISATION_TRUNCATE_CHARS = 200
+_TRUNCATION_SUFFIX = (
+    "...[truncated, use include_full_authorisation=true to see full text]"
+)
+# (dataset_id, dimension_key) → max chars for the auto-truncate behaviour.
+_TRUNCATE_RULES: dict[tuple[str, str], int] = {
+    ("ASIC_AFS_LICENSEE", "authorisation"): _AUTHORISATION_TRUNCATE_CHARS,
+}
+
+
+def _truncate_record_text(
+    record: Observation, rules: dict[str, int]
+) -> None:
+    """Truncate long free-text dimension values on a single Observation in place.
+
+    `rules` maps {dimension_key: max_chars}. Values are only truncated when
+    they exceed `max_chars`; shorter values pass through unchanged so the
+    suffix never appears unnecessarily.
+    """
+    for dim_key, max_chars in rules.items():
+        v = record.dimensions.get(dim_key)
+        if not isinstance(v, str) or len(v) <= max_chars:
+            continue
+        record.dimensions[dim_key] = v[:max_chars] + _TRUNCATION_SUFFIX
+
 
 def _safe_value(v: Any) -> float | None:
     if v is None:
@@ -461,6 +493,7 @@ def build_response(
     fmt: str,
     user_query: dict[str, Any],
     last_n: int | None = None,
+    include_full_authorisation: bool = False,
 ) -> DataResponse:
     """The single entrypoint shaping uses to build a DataResponse from a parsed df.
 
@@ -471,7 +504,10 @@ def build_response(
     4. Resolve `measures` to a list of measure keys.
     5. Shape per layout (wide vs transposed).
     6. Optionally trim to last_n records per measure.
-    7. Emit in the requested format (records / series / csv).
+    7. Apply per-dataset bloat-trim rules (e.g. ASIC_AFS_LICENSEE's
+       `authorisation` field — 2-3 KB of license boilerplate per record —
+       truncated to ~200 chars unless `include_full_authorisation=True`).
+    8. Emit in the requested format (records / series / csv).
     """
     renamed = _apply_aliases(df, cd)
     coerced = _coerce_dtypes(renamed, cd)
@@ -509,6 +545,20 @@ def build_response(
                     key=lambda r: _normalize_period(r.period or "") or "",
                 )
                 records.extend(group_sorted[-last_n:])
+
+    # Per-dataset bloat-trim: truncate verbose free-text dimension values
+    # (e.g. ASIC_AFS_LICENSEE's `authorisation`) unless the caller opted in
+    # to the full text. Done in-place on `records` so the same trimming
+    # applies regardless of output format (records / series / csv).
+    if not include_full_authorisation:
+        active_rules = {
+            dim_key: max_chars
+            for (ds_id, dim_key), max_chars in _TRUNCATE_RULES.items()
+            if ds_id == cd.id
+        }
+        if active_rules:
+            for rec in records:
+                _truncate_record_text(rec, active_rules)
 
     response_unit: str | None = None
     if records:

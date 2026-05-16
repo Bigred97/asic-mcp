@@ -5,6 +5,30 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.2] - 2026-05-16
+
+### Changed
+
+- `ASIC_AFS_LICENSEE`: `authorisation` field truncated to ~200 chars
+  by default (boilerplate text was 2-3 KB per record). Pass
+  `include_full_authorisation=true` to `get_data` / `latest` to get
+  the full text. Brings typical N=50 responses from ~23.5k tokens
+  down to ~8.7k — back under the portfolio's 10k-token target.
+- New tool parameter `include_full_authorisation: bool = False` on
+  `get_data` and `latest`. Ignored for the other 6 ASIC datasets.
+
+### Tests
+
+- 253 unit tests passing (was 249). 10× zero-flake gauntlet.
+- `test_afs_licensee_authorisation_truncated_by_default` —
+  default-path regression test.
+- `test_afs_licensee_full_authorisation_opt_in` — opt-in path test.
+- `test_afs_licensee_truncation_does_not_leak_to_other_dimensions`
+  — guards against the rule expanding past `authorisation`.
+- `test_other_asic_datasets_unaffected_by_truncation` — sanity
+  check that ASIC_AFS_AUTH_REP (and by extension the other 5
+  datasets) ship unaffected.
+
 ## [0.6.1] - 2026-05-16
 
 ### Changed

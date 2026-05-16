@@ -465,6 +465,7 @@ async def _get_data_impl(
     end_period: Any,
     fmt: Any,
     last_n: int | None = None,
+    include_full_authorisation: bool = False,
 ) -> DataResponse:
     # Reset the graceful-degradation flag at the start of each tool call so
     # we only report staleness introduced by THIS call's fetches.
@@ -526,6 +527,7 @@ async def _get_data_impl(
         fmt=fmt_norm,
         user_query=user_query,
         last_n=last_n,
+        include_full_authorisation=include_full_authorisation,
     )
     # If the byte fetch served a stale-cache fallback because data.gov.au
     # was unreachable, propagate the staleness to the response so the agent
@@ -597,6 +599,21 @@ async def get_data(
             examples=["records", "series", "csv"],
         ),
     ] = "records",
+    include_full_authorisation: Annotated[
+        bool,
+        Field(
+            description=(
+                "ASIC_AFS_LICENSEE only. The `authorisation` field carries 2-3 KB "
+                "of license boilerplate per record (which financial services and "
+                "products the licensee may deal in). To keep responses under the "
+                "portfolio's 10k-token target, that field is truncated to ~200 "
+                "chars by default with a [truncated] suffix. Pass True to receive "
+                "the full text — useful when verifying scope conditions for a "
+                "specific licensee. Ignored for the other ASIC datasets."
+            ),
+            examples=[False, True],
+        ),
+    ] = False,
 ) -> DataResponse:
     """Query a curated ASIC register dataset and return matching rows.
 
@@ -619,12 +636,20 @@ async def get_data(
             start_period="2024-01-01",
         )
 
+        # Full authorisation text for one AFS licensee
+        resp = await get_data(
+            "ASIC_AFS_LICENSEE",
+            filters={"licensee_name": "Macquarie Bank Limited"},
+            include_full_authorisation=True,
+        )
+
     Returns:
         DataResponse with records (or csv), unit, period bounds, row_count,
         source URL, and CC-BY 3.0 AU attribution.
     """
     return await _get_data_impl(
-        dataset_id, filters, start_period, end_period, format
+        dataset_id, filters, start_period, end_period, format,
+        include_full_authorisation=include_full_authorisation,
     )
 
 
@@ -668,6 +693,19 @@ async def latest(
             examples=[50, 100, 500],
         ),
     ] = 50,
+    include_full_authorisation: Annotated[
+        bool,
+        Field(
+            description=(
+                "ASIC_AFS_LICENSEE only. The `authorisation` field carries 2-3 KB "
+                "of license boilerplate per record. To stay under the portfolio's "
+                "10k-token target, that field is truncated to ~200 chars by "
+                "default. Pass True to receive the full text — typically used "
+                "when narrowing to one licensee. Ignored for the other ASIC datasets."
+            ),
+            examples=[False, True],
+        ),
+    ] = False,
 ) -> DataResponse:
     """Return the most recent observation(s) per measure for a dataset.
 
@@ -691,9 +729,17 @@ async def latest(
 
         # Get 500 rows in one go (still capped, but bigger window)
         resp = await latest("ASIC_AFS_LICENSEE", limit=500)
+
+        # Full authorisation text for one AFS licensee
+        resp = await latest(
+            "ASIC_AFS_LICENSEE",
+            filters={"licensee_name": "Macquarie Bank Limited"},
+            include_full_authorisation=True,
+        )
     """
     resp = await _get_data_impl(
-        dataset_id, filters, None, None, "records", last_n=1
+        dataset_id, filters, None, None, "records", last_n=1,
+        include_full_authorisation=include_full_authorisation,
     )
     # Cap the response so a 360k-row register doesn't bomb the agent's
     # context. Surface the original count via truncated_at so the agent

@@ -102,6 +102,84 @@ class TestAFSLicensee:
         assert "authorisation" in first.dimensions
         assert isinstance(first.dimensions["authorisation"], str)
 
+    def test_afs_licensee_authorisation_truncated_by_default(self):
+        """Regression (v0.6.2): `authorisation` carried 2-3 KB per record,
+        blowing the portfolio's 10k-token response budget. It must now be
+        truncated to ~200 chars by default with an opt-in suffix.
+        """
+        _, resp = _build("ASIC_AFS_LICENSEE", self.fixture)
+        assert resp.row_count >= 5
+        # Source values are well over 200 chars (mean ~1.4 KB), so every
+        # fixture record should land at exactly the truncated form.
+        for rec in resp.records:
+            auth = rec.dimensions.get("authorisation")
+            assert isinstance(auth, str)
+            # Either short enough to pass through unchanged, OR
+            # truncated to the 200-char prefix + suffix.
+            if "[truncated, use include_full_authorisation=true" in auth:
+                assert len(auth) < 400, (
+                    f"truncated authorisation should be ~270 chars "
+                    f"(200 prefix + suffix), got {len(auth)}"
+                )
+            else:
+                # The pass-through case must be a genuinely short source value.
+                assert len(auth) <= 200, (
+                    f"untruncated authorisation must be <=200 chars "
+                    f"(would otherwise need the suffix), got {len(auth)}"
+                )
+        # And at least the first record (real ASIC data, multi-KB) must
+        # be in the truncated form — otherwise the rule isn't firing.
+        assert "[truncated, use include_full_authorisation=true" in (
+            resp.records[0].dimensions["authorisation"]
+        )
+
+    def test_afs_licensee_full_authorisation_opt_in(self):
+        """Opt-in path: include_full_authorisation=True returns the full
+        license-conditions text with no truncation suffix.
+        """
+        _, resp_default = _build("ASIC_AFS_LICENSEE", self.fixture)
+        _, resp_full = _build(
+            "ASIC_AFS_LICENSEE", self.fixture,
+            include_full_authorisation=True,
+        )
+        first_default = resp_default.records[0].dimensions["authorisation"]
+        first_full = resp_full.records[0].dimensions["authorisation"]
+
+        # Default form is truncated; opt-in form is not.
+        assert "[truncated, use include_full_authorisation=true" in first_default
+        assert "[truncated, use include_full_authorisation=true" not in first_full
+        # Opt-in must be strictly longer (real source is multi-KB).
+        assert len(first_full) > len(first_default)
+        # Opt-in form must start with the same prefix as the default
+        # (truncation must be a prefix slice, not arbitrary subsetting).
+        assert first_full.startswith(first_default[:200])
+
+    def test_afs_licensee_truncation_does_not_leak_to_other_dimensions(self):
+        """Other dimensions on ASIC_AFS_LICENSEE (licensee_name, abn_acn,
+        locality, ...) must never carry the truncation suffix — only the
+        `authorisation` field is in the bloat-trim rule set.
+        """
+        _, resp = _build("ASIC_AFS_LICENSEE", self.fixture)
+        for rec in resp.records:
+            for key, val in rec.dimensions.items():
+                if key == "authorisation":
+                    continue
+                if isinstance(val, str):
+                    assert "[truncated" not in val, (
+                        f"unexpected truncation marker on {key!r}: {val!r}"
+                    )
+
+    def test_other_asic_datasets_unaffected_by_truncation(self):
+        """Sanity: the truncation rule is scoped to ASIC_AFS_LICENSEE.
+        Other ASIC datasets must serve every dimension full-fidelity.
+        """
+        # ASIC_AFS_AUTH_REP shares no schema overlap with the trim rule.
+        _, resp = _build("ASIC_AFS_AUTH_REP", "asic_afs_auth_rep.csv")
+        for rec in resp.records:
+            for val in rec.dimensions.values():
+                if isinstance(val, str):
+                    assert "[truncated" not in val
+
 
 # ---------------------------------------------------------------------------
 # ASIC_AFS_AUTH_REP
