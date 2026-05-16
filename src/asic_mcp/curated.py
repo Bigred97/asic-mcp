@@ -84,6 +84,13 @@ class CuratedDataset:
     # current download URL via CKAN at fetch time so new yearly releases
     # land without a YAML edit. See discovery.py.
     discovery: dict | None = None
+    # Optional date-templated URL: a daily-cadence CSV at a predictable URL
+    # (e.g. ASIC short-position reports). When present, the server probes
+    # the last `url_template_lookback_days` business days to find the
+    # most-recent published file. The token `{date:YYYYMMDD}` is replaced
+    # with the candidate date string. download_url is the literal fallback.
+    url_template: str | None = None
+    url_template_lookback_days: int = 10
 
 
 _REGISTRY: dict[str, CuratedDataset] | None = None
@@ -171,6 +178,8 @@ def _load_one(path: Path) -> CuratedDataset:
         metric_label_column=raw.get("metric_label_column"),
         unit_column=raw.get("unit_column"),
         discovery=discovery_raw,
+        url_template=raw.get("url_template"),
+        url_template_lookback_days=int(raw.get("url_template_lookback_days", 10)),
     )
 
 

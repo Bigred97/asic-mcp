@@ -20,6 +20,7 @@ import difflib
 import hashlib
 import re
 from collections import OrderedDict
+from datetime import date, timedelta
 from typing import Annotated, Any, Literal
 
 import pandas as pd
@@ -175,6 +176,8 @@ async def _resolve_download_url(cd: curated.CuratedDataset, client: ASICClient) 
     URL via CKAN. On any failure, silently fall back to the YAML default —
     discovery upgrades staleness; it must not introduce new failure modes.
     """
+    if cd.url_template:
+        return await _resolve_dated_url(cd, client)
     if not cd.discovery:
         return cd.download_url
     try:
@@ -193,6 +196,39 @@ async def _resolve_download_url(cd: curated.CuratedDataset, client: ASICClient) 
         return await resolve_latest_url(client, spec)
     except DiscoveryError:
         return cd.download_url
+
+
+async def _resolve_dated_url(cd: curated.CuratedDataset, client: ASICClient) -> str:
+    """Probe a date-templated URL for the most recently published file.
+
+    Used for daily-cadence ASIC publications (e.g. short position reports)
+    which have predictable URL patterns like
+    `https://download.asic.gov.au/short-selling/RR{date:YYYYMMDD}-001-...csv`
+    but are subject to T+N business-day publishing delays.
+
+    Iterates backward from today up to `url_template_lookback_days` calendar
+    days, probing each URL with HEAD. Returns the first 200-OK URL.
+    Falls back to `cd.download_url` if nothing in the window is found.
+
+    Public holidays / weekends are handled by the probe (404s skipped); we
+    don't bother with an Australian business-day calendar.
+    """
+    assert cd.url_template is not None
+    today = date.today()
+    last_err: Exception | None = None
+    for delta in range(cd.url_template_lookback_days + 1):
+        cand = today - timedelta(days=delta)
+        url = cd.url_template.replace("{date:YYYYMMDD}", cand.strftime("%Y%m%d"))
+        try:
+            ok = await client.head_ok(url)
+        except Exception as e:  # network errors — fall through to next date
+            last_err = e
+            continue
+        if ok:
+            return url
+    # Nothing in the window worked — fall back to the literal download_url
+    # in the YAML so the caller still sees a coherent error chain.
+    return cd.download_url
 
 
 async def _fetch_and_parse(cd: curated.CuratedDataset, *, kind: str = "data"):

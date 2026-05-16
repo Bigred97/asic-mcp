@@ -98,6 +98,22 @@ class ASICClient:
             raise ASICAPIError(f"Refusing to fetch non-http(s) URL: {url!r}")
         return await self._fetch_cached(url, kind=kind)
 
+    async def head_ok(self, url: str) -> bool:
+        """Cheap probe — return True if the URL responds 2xx to a HEAD.
+
+        Used by date-templated URL resolvers (ASIC short positions) which
+        need to find the latest published file without downloading bytes
+        for every candidate date. Not cached — the result is the URL
+        decision; the actual fetch follows separately via fetch_resource.
+        """
+        if not url.startswith(("http://", "https://")):
+            return False
+        try:
+            resp = await self._http.head(url)
+        except httpx.HTTPError:
+            return False
+        return 200 <= resp.status_code < 300
+
     async def fetch_package(self, package_id: str) -> dict[str, Any]:
         """Fetch CKAN package_show for a dataset slug. Returns the result dict.
 

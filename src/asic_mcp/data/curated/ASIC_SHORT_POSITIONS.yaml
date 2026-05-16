@@ -1,0 +1,72 @@
+id: ASIC_SHORT_POSITIONS
+name: ASIC Daily Aggregated Short Position Report
+description: |
+  Daily snapshot of reported short positions for every ASX-listed equity,
+  published by ASIC with a T+4 business-day lag. ~2,000 rows per day —
+  one row per product (ASX ticker) showing reported short positions,
+  total product in issue, and the resulting short-interest percentage.
+
+  Use this for: highest-shorted stocks today, short-interest tracking for
+  a specific ticker, hedge fund position monitoring, market-wide short
+  pressure analysis. The data ASIC publishes is what licensed short
+  sellers report each day — it's the regulator's official short-interest
+  measure for the Australian market.
+
+  This dataset uses a date-driven URL pattern. `latest()` returns the
+  most-recent published day's CSV (the server probes the last 10 calendar
+  days backward to find the latest available). For a specific date, ASIC
+  publishes T+4 business days, so today's data appears about a week later
+  on weekdays.
+  Source: ASIC short position reporting under Corporations Act 2001 s.1020AB.
+period_coverage: daily snapshot (T+4 business-day publication lag)
+update_frequency: daily
+source_url: https://asic.gov.au/regulatory-resources/markets/short-selling/short-position-reports-table/
+download_url: https://download.asic.gov.au/short-selling/RR20260508-001-SSDailyAggShortPos.csv
+url_template: https://download.asic.gov.au/short-selling/RR{date:YYYYMMDD}-001-SSDailyAggShortPos.csv
+url_template_lookback_days: 10
+format: csv
+sheet: null
+header_row: 1
+layout: wide
+cache_kind: data
+search_keywords:
+  - short positions
+  - short interest
+  - short selling
+  - shorted stocks
+  - most shorted
+  - short interest report
+  - daily short positions
+  - asic short
+  - hedge fund positions
+  - asx short interest
+  - short ratio
+columns:
+  product:
+    source_column: "Product"
+    description: Full security description (e.g. "BHP GROUP LIMITED ORDINARY"). Use product_code for a clean ticker.
+    role: id
+    dtype: string
+  product_code:
+    source_column: "Product Code"
+    description: ASX ticker (e.g. BHP, CBA, QAN). Three- or four-letter code.
+    role: id
+    dtype: string
+  reported_short_positions:
+    source_column: "Reported Short Positions"
+    description: Number of shares reported as held in short positions on this trading day.
+    unit: Shares
+    role: measure
+    dtype: int
+  total_product_in_issue:
+    source_column: "Total Product in Issue"
+    description: Total shares on issue for this product.
+    unit: Shares
+    role: measure
+    dtype: int
+  short_percent:
+    source_column: "% of Total Product in Issue Reported as Short Positions"
+    description: Short positions as a percentage of total issued shares — the headline "short interest %" for this security on this day.
+    unit: Per cent
+    role: measure
+    dtype: float

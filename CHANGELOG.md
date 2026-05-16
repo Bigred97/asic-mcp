@@ -5,6 +5,52 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.5.0] - 2026-05-16
+
+### Added — ASIC_SHORT_POSITIONS daily market data feed (Wave 3)
+
+- **`ASIC_SHORT_POSITIONS` curated dataset.** Daily reported short
+  positions for every ASX-listed equity (~2,000 securities), with T+4
+  business-day publication lag. Each row carries reported short positions,
+  total product on issue, and the resulting short-interest percentage.
+  This is the regulator's official short-interest measure for the
+  Australian market — the dataset hedge funds, equity researchers, and
+  financial media use daily.
+- **Date-templated URL infrastructure (new).** Introduces the
+  `url_template: "...{date:YYYYMMDD}..."` YAML field plus
+  `url_template_lookback_days` (default 10). The server probes the last
+  N calendar days with HEAD requests to find the most-recent published
+  file. Handles weekends and public holidays automatically — no business-
+  day calendar required.
+- New `ASICClient.head_ok()` method on the HTTP client — cheap probe used
+  by the date resolver. ~5 LOC.
+- New `_resolve_dated_url()` helper in server.py — ~25 LOC.
+
+### Customer-value validation (live ASIC fetch, 2026-05-16)
+
+- Most-shorted query: `latest('ASIC_SHORT_POSITIONS', limit=10)` returns
+  the top 10 of 2,193 securities (truncated_at=2193).
+- Ticker lookup: `get_data('ASIC_SHORT_POSITIONS', filters={'product_code':'BHP'})`
+  returns 3 records (reported shorts 63.35M, total issued 5.08B, short
+  percent 1.25%).
+- Search routing: "short positions", "short interest", "most shorted",
+  "short selling" all surface ASIC_SHORT_POSITIONS at #1.
+
+### Known limitation
+
+- `top_n` is not available on asic-mcp (intentionally absent for
+  registers per the v0.1 design); clients wanting "top 10 most-shorted"
+  currently fetch all rows via `latest(... limit=10000)` and sort
+  client-side. Adding `top_n` to asic-mcp for this market-data dataset
+  is a follow-up.
+
+### Tests
+
+- 249 unit tests now (was 246). 10× zero-flake gauntlet.
+- Test predicates that asserted "every dataset is a weekly/monthly
+  register with CKAN discovery" updated to except ASIC_SHORT_POSITIONS
+  (daily-cadence market data with date-templated URL).
+
 ## [0.4.1] - 2026-05-16
 
 ### Fixed

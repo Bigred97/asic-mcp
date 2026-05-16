@@ -45,23 +45,42 @@ def test_every_curated_dataset_has_asic_prefix():
 
 
 def test_every_curated_dataset_is_weekly_or_monthly():
-    """ASIC register datasets refresh weekly or monthly — no other cadences in v0.1."""
+    """ASIC register datasets refresh weekly or monthly. ASIC_SHORT_POSITIONS is
+    daily-cadence (the only exception — it's a market data feed, not a register).
+    """
+    DAILY_FEEDS = {"ASIC_SHORT_POSITIONS"}
     for cd in curated.list_all():
+        if cd.id in DAILY_FEEDS:
+            assert cd.update_frequency == "daily"
+            continue
         assert cd.update_frequency in ("weekly", "monthly"), (
             f"{cd.id} unexpected update_frequency {cd.update_frequency!r}"
         )
 
 
 def test_every_curated_dataset_has_discovery_block():
-    """All v0.1 datasets use CKAN discovery so URL refresh is automatic."""
+    """All register datasets use CKAN discovery. ASIC_SHORT_POSITIONS uses a
+    date-templated URL pattern (url_template) instead — it's a daily market
+    data feed, not a CKAN-published register.
+    """
+    URL_TEMPLATE_FEEDS = {"ASIC_SHORT_POSITIONS"}
     for cd in curated.list_all():
+        if cd.id in URL_TEMPLATE_FEEDS:
+            assert cd.url_template is not None, f"{cd.id} should declare url_template"
+            continue
         assert cd.discovery is not None, f"{cd.id} has no discovery block"
         assert "package_id" in cd.discovery, f"{cd.id} discovery missing package_id"
 
 
 def test_every_curated_dataset_cache_kind_is_register():
-    """Register data uses the 24h `register` cache TTL, not 7-day `data`."""
+    """Register data uses the 24h `register` cache TTL. ASIC_SHORT_POSITIONS
+    is daily-cadence market data and uses the 7-day `data` cache instead.
+    """
+    DAILY_FEEDS = {"ASIC_SHORT_POSITIONS"}
     for cd in curated.list_all():
+        if cd.id in DAILY_FEEDS:
+            assert cd.cache_kind == "data"
+            continue
         assert cd.cache_kind == "register", (
             f"{cd.id} cache_kind {cd.cache_kind!r} — registers should be 'register'"
         )
@@ -113,8 +132,9 @@ def test_state_dimension_consistent_across_datasets():
 
 def test_register_name_is_constant_column_in_every_dataset():
     """Most ASIC register CSVs have a REGISTER_NAME column we expose as register_name.
-    Exception: ASIC_COMPANIES uses a different CSV schema without REGISTER_NAME."""
-    no_register_name = {"ASIC_COMPANIES"}
+    Exceptions: ASIC_COMPANIES uses a different CSV schema without REGISTER_NAME,
+    ASIC_SHORT_POSITIONS is a market data feed (not a register)."""
+    no_register_name = {"ASIC_COMPANIES", "ASIC_SHORT_POSITIONS"}
     for cd in curated.list_all():
         if cd.id in no_register_name:
             continue
