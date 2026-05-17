@@ -102,12 +102,12 @@ def _normalize_dataset_id(dataset_id: Any) -> str:
     if not isinstance(dataset_id, str):
         raise ValueError(
             f"dataset_id must be a string, got {type(dataset_id).__name__}. "
-            "Try search_datasets() or list_curated() to discover IDs."
+            "Search by keyword or enumerate the curated set to discover IDs."
         )
     norm = dataset_id.strip().upper()
     if not norm:
         raise ValueError(
-            "dataset_id is empty. Try list_curated() to see available IDs."
+            "dataset_id is empty. Enumerate the curated set to see available IDs."
         )
     if not _DATASET_ID_PATTERN.match(norm):
         raise ValueError(
@@ -420,7 +420,7 @@ async def describe_dataset(
             f"Dataset {dataset_id!r} is not a curated asic-mcp dataset. "
             f"{hint}"
             f"Valid options: {valid}. "
-            "Try search_datasets('<topic>') or list_curated() to discover IDs."
+            "Search by keyword or enumerate the curated set to discover IDs."
         )
     dims_out = [
         ColumnDetail(
@@ -484,7 +484,7 @@ async def _get_data_impl(
             f"Dataset {dataset_id!r} is not a curated asic-mcp dataset. "
             f"{hint}"
             f"Valid options: {valid}. "
-            "Try search_datasets('<topic>') or list_curated() to discover IDs."
+            "Search by keyword or enumerate the curated set to discover IDs."
         )
     filters_d = _validate_filters(filters)
     start_v = _validate_period(start_period, "start_period")

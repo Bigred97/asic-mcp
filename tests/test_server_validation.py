@@ -6,6 +6,10 @@ rather than crashing partway through with an obscure error.
 """
 from __future__ import annotations
 
+import ast
+import pathlib
+import re
+
 import pytest
 
 from asic_mcp import server
@@ -217,15 +221,15 @@ async def test_describe_unknown_dataset_suggests_close_match():
     msg = str(exc_info.value)
     assert "Did you mean" in msg
     assert "ASIC_FINANCIAL_ADVISERS" in msg
-    # And the hint should still point at discovery tools
-    assert "list_curated" in msg or "search_datasets" in msg
+    # And the hint should still point at discovery (transport-agnostic phrasing)
+    assert "curated set" in msg or "search by keyword" in msg.lower()
 
 
 def test_unknown_filter_suggests_close_match_via_shaping():
     """Mistyped filter keys ('adviser_no' instead of 'adviser_number')
-    should surface a difflib 'Did you mean' suggestion plus a pointer at
-    describe_dataset(). Asserts against shaping._apply_filters directly so
-    the test stays network-free."""
+    should surface a difflib 'Did you mean' suggestion plus a transport-
+    agnostic pointer at the describe surface. Asserts against
+    shaping._apply_filters directly so the test stays network-free."""
     import pandas as pd
 
     from asic_mcp import curated as curated_mod
@@ -240,4 +244,72 @@ def test_unknown_filter_suggests_close_match_via_shaping():
     assert "is not a column on" in msg
     assert "Did you mean" in msg
     assert "adviser_number" in msg
-    assert "describe_dataset" in msg
+    assert "describe endpoint or describe tool" in msg
+
+
+# ----- transport-agnostic error hints (mirrors rba-mcp's guard) -----
+#
+# Error messages must not reference MCP-tool names (e.g. `describe_dataset()`,
+# `search_datasets()`, `list_curated()`). An error from the asic_mcp package
+# should read the same whether the caller is an MCP client, a REST gateway,
+# or a Python script calling the functions directly.
+
+_SRC_ROOT = pathlib.Path(__file__).resolve().parent.parent / "src" / "asic_mcp"
+
+
+def _extract_user_facing_strings() -> list[tuple[pathlib.Path, int, str]]:
+    """Walk every .py under src/asic_mcp/, parse the AST, and yield only the
+    string arguments to `raise <SomeExc>(...)` calls — these are the strings
+    users actually see in error reports.
+    """
+    out: list[tuple[pathlib.Path, int, str]] = []
+    for py in _SRC_ROOT.rglob("*.py"):
+        tree = ast.parse(py.read_text(encoding="utf-8"))
+        for node in ast.walk(tree):
+            if not isinstance(node, ast.Raise) or node.exc is None:
+                continue
+            call = node.exc if isinstance(node.exc, ast.Call) else None
+            if call is None:
+                continue
+            for arg in call.args:
+                pieces: list[str] = []
+                if isinstance(arg, ast.Constant) and isinstance(arg.value, str):
+                    pieces.append(arg.value)
+                elif isinstance(arg, ast.JoinedStr):
+                    for v in arg.values:
+                        if isinstance(v, ast.Constant) and isinstance(v.value, str):
+                            pieces.append(v.value)
+                elif isinstance(arg, ast.BinOp):
+                    stack: list[ast.AST] = [arg]
+                    while stack:
+                        cur = stack.pop()
+                        if isinstance(cur, ast.Constant) and isinstance(cur.value, str):
+                            pieces.append(cur.value)
+                        elif isinstance(cur, ast.BinOp):
+                            stack.append(cur.left)
+                            stack.append(cur.right)
+                        elif isinstance(cur, ast.JoinedStr):
+                            for v in cur.values:
+                                stack.append(v)
+                if pieces:
+                    out.append((py, node.lineno, "".join(pieces)))
+    return out
+
+
+def test_no_mcp_tool_refs_in_error_strings():
+    """No error message references an MCP tool by name
+    (`describe_dataset(...)`, `search_datasets(...)`, `list_curated(...)`).
+    The hint must suggest what to do (look up valid keys, retry, etc.)
+    without naming a specific transport's API surface.
+    """
+    pat = re.compile(r"\b(describe_dataset|search_datasets|list_curated)\s*\(")
+    offenders: list[str] = []
+    for path, lineno, text in _extract_user_facing_strings():
+        if pat.search(text):
+            offenders.append(f"{path.relative_to(_SRC_ROOT.parent.parent)}:{lineno}: {text!r}")
+    assert not offenders, (
+        "User-facing error messages reference MCP tool names — "
+        "these are transport-specific and shouldn't leak through ValueError. "
+        "Replace with transport-agnostic hints (e.g. 'See the valid-options list "
+        f"for X').\n  {chr(10).join(offenders)}"
+    )

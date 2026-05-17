@@ -331,7 +331,7 @@ def translate_filter_value(
         f"{hint}"
         f"Valid options: {', '.join(valid[:10])}"
         + ("..." if len(valid) > 10 else "")
-        + f". Try describe_dataset({cd.id!r}) to see all accepted values."
+        + f". Use the describe endpoint or describe tool to see all accepted values for {cd.id!r}."
     )
 
 
@@ -412,14 +412,14 @@ def resolve_measure_keys(
                     f"Unknown measure {v!r} for dataset {cd.id!r}. "
                     f"{hint}"
                     f"Valid measures: {valid_hint}{ellipsis}. "
-                    f"Try describe_dataset({cd.id!r}) to see the full measure list."
+                    f"Use the describe endpoint or describe tool to see the full measure list for {cd.id!r}."
                 )
             else:
                 raise ValueError(
                     f"Unknown measure {v!r} for dataset {cd.id!r}. "
                     f"This dataset has no curated measures — it is a "
                     "dimension-only register. Omit `measures` to return all rows, "
-                    f"or try describe_dataset({cd.id!r}) to see the dimension list."
+                    f"or use the describe endpoint or describe tool to see the dimension list for {cd.id!r}."
                 )
     # Dedupe while preserving order.
     seen: set[str] = set()

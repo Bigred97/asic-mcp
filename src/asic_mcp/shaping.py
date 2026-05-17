@@ -117,21 +117,52 @@ def _apply_aliases(df: pd.DataFrame, cd: CuratedDataset) -> pd.DataFrame:
 
 
 def _coerce_dtypes(df: pd.DataFrame, cd: CuratedDataset) -> pd.DataFrame:
-    """Apply per-column dtype hints from the curated YAML."""
+    """Apply per-column dtype hints from the curated YAML.
+
+    Date columns (declared `dtype: date` OR auto-detected by `*_date` name
+    suffix) are normalised from ASIC's dd/mm/yyyy source format to ISO
+    YYYY-MM-DD — matches the portfolio "Cross-Agency Joining" period
+    convention so customers can join ASIC dates with ABS/RBA/ATO dates.
+    """
     for col in cd.columns.values():
-        if col.dtype and col.key in df.columns:
-            try:
-                if col.dtype in ("int", "integer"):
-                    df[col.key] = pd.to_numeric(df[col.key], errors="coerce").astype("Int64")
-                elif col.dtype in ("float", "number"):
-                    df[col.key] = pd.to_numeric(df[col.key], errors="coerce")
-                elif col.dtype in ("string", "str"):
-                    df[col.key] = _to_clean_string(df[col.key])
-            except (ValueError, TypeError):
-                # Lenient — coercion failures fall through; the data ships
-                # in whatever dtype pandas inferred originally.
-                pass
+        if col.key not in df.columns:
+            continue
+        try:
+            if col.dtype in ("int", "integer"):
+                df[col.key] = pd.to_numeric(df[col.key], errors="coerce").astype("Int64")
+            elif col.dtype in ("float", "number"):
+                df[col.key] = pd.to_numeric(df[col.key], errors="coerce")
+            elif col.dtype in ("string", "str"):
+                df[col.key] = _to_clean_string(df[col.key])
+                # After string coercion: auto-normalise *_date columns from
+                # dd/mm/yyyy to ISO YYYY-MM-DD if the source data matches.
+                if col.key.endswith("_date") or col.dtype == "date":
+                    df[col.key] = _normalize_ddmmyyyy_to_iso(df[col.key])
+            elif col.dtype == "date":
+                df[col.key] = _normalize_ddmmyyyy_to_iso(_to_clean_string(df[col.key]))
+        except (ValueError, TypeError):
+            # Lenient — coercion failures fall through; the data ships
+            # in whatever dtype pandas inferred originally.
+            pass
     return df
+
+
+def _normalize_ddmmyyyy_to_iso(series: pd.Series) -> pd.Series:
+    """Convert ASIC dd/mm/yyyy date strings to ISO YYYY-MM-DD.
+
+    Leaves missing values (<NA>) and already-ISO values untouched. ASIC
+    publishes all register dates in DD/MM/YYYY format; the portfolio
+    standard is ISO YYYY-MM-DD for cross-source joins. Non-parseable
+    values pass through unchanged (lenient).
+    """
+    # Use pandas datetime parser with the explicit dd/mm/yyyy format,
+    # then re-format to ISO. errors='coerce' converts unparseable to NaT
+    # which we then re-merge with the original string (preserving
+    # already-ISO values like '2024-08-08' or sentinels like 'CURRENT').
+    parsed = pd.to_datetime(series, format="%d/%m/%Y", errors="coerce")
+    iso = parsed.dt.strftime("%Y-%m-%d")
+    # Where parsing succeeded, use ISO; elsewhere keep the original string.
+    return iso.where(parsed.notna(), series)
 
 
 def _to_clean_string(series: pd.Series) -> pd.Series:
@@ -175,7 +206,7 @@ def _apply_filters(
                 f"{hint}"
                 f"Valid filters: {', '.join(valid[:10])}"
                 f"{'...' if len(valid) > 10 else ''}. "
-                f"Try describe_dataset({cd.id!r}) to see all filter columns."
+                f"Use the describe endpoint or describe tool to see all filter columns for {cd.id!r}."
             )
         # Lists mean "OR" across values.
         if isinstance(user_val, list):
