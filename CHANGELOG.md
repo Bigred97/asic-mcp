@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.4] - 2026-05-17
+
+### Fixed — sync CSV/XLSX parse no longer blocks the event loop
+
+`get_data()` and `latest()` previously called `pd.read_csv` / `pd.read_excel` synchronously inside the async tool body, which blocked the event loop for the entire parse duration. For large ASIC registers (`ASIC_AFS_AUTH_REP` ~50k rows / 50MB CSV) this could stall a downstream consumer (e.g. ausdata-api gateway worker) for 5-20+ seconds and trip 20s upstream timeouts.
+
+Fix: wrap both parser entry points with `asyncio.to_thread(...)` in `server.py`. The sync pandas work now runs in the default ThreadPoolExecutor, the event loop yields cooperatively, and the gateway can handle other concurrent requests during the parse. Tests 254/254 pass. No public API change; pure latency / concurrency win.
+
+Reported via ausdata-api customer-simulation testing (`ASIC_AFS_AUTH_REP` timing out at 20s). The gateway blocklist on `asic.ASIC_AFS_AUTH_REP` can now be removed.
+
 ## [0.6.3] - 2026-05-17
 
 ### Changed — date columns now ISO YYYY-MM-DD across all registers

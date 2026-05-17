@@ -277,15 +277,21 @@ async def _fetch_and_parse(cd: curated.CuratedDataset, *, kind: str = "data"):
             _df_cache.move_to_end(cache_key)
             return cached
 
+    # Run sync pandas parse off the event loop. ASIC_AFS_AUTH_REP (50k+ rows,
+    # ~50MB CSV) otherwise blocks the async tool for seconds and times out
+    # downstream consumers like the ausdata-api gateway. `asyncio.to_thread`
+    # offloads to the default ThreadPoolExecutor; the event loop stays free
+    # to serve other concurrent requests during the parse.
     if cd.format == "csv":
-        df = read_csv(body)
+        df = await asyncio.to_thread(read_csv, body)
     else:
         if cd.sheet is None:
             raise ValueError(
                 f"Dataset {cd.id!r} declares format='xlsx' but has no sheet name. "
                 "Fix the curated YAML."
             )
-        df = read_xlsx(
+        df = await asyncio.to_thread(
+            read_xlsx,
             body,
             sheet=cd.sheet,
             header_row=cd.header_row,
