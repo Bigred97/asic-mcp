@@ -5,6 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.11] - 2026-05-18
+
+### Fixed — short-query ranker misses ('ABN', 'SMSF', 'auditor')
+
+Single-token queries were length-penalised by `token_set_ratio` against
+long dataset names. For ≤2-token queries we now also compute
+`partial_ratio` and take the max so substring matches still score 100.
+Matches ato 0.8.16 design.
+
+254 unit tests pass.
+
 ## [0.6.10] - 2026-05-18
 
 ### Fixed — CI lint failure (unused `rapidfuzz.process` import)

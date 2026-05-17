@@ -51,6 +51,11 @@ def search(query: str, limit: int = 10) -> list[DatasetSummary]:
     PHRASE_BONUS = 15  # query as contiguous substring of id+name
     keyword_lookup = {cd.id: " ".join(cd.search_keywords) for cd in curated_mod.list_all()}
     query_lc = query.lower()
+    # Short single-token queries get length-penalised by token_set_ratio;
+    # supplement with partial_ratio so substring matches still score
+    # 100. Matches ato-mcp 0.8.16 design.
+    q_token_count = len([t for t in query_lc.split() if t.strip()])
+    use_partial_supplement = q_token_count <= 2
     # Three-pool design: id+name is the PRIMARY discriminator (a curated
     # dataset's own name is the strongest semantic match). Keywords
     # broaden recall but at reduced weight — otherwise an unrelated
@@ -64,6 +69,8 @@ def search(query: str, limit: int = 10) -> list[DatasetSummary]:
         kw_str = f"{name_str} {keyword_lookup.get(s.id, '')}".lower()
         desc_str = (s.description or "").lower()
         name_high = fuzz.token_set_ratio(query_lc, name_str)
+        if use_partial_supplement:
+            name_high = max(name_high, fuzz.partial_ratio(query_lc, name_str))
         kw_high = fuzz.token_set_ratio(query_lc, kw_str)
         desc_raw = fuzz.WRatio(query_lc, desc_str) if desc_str else 0
         desc = min(desc_raw, DESCRIPTION_CAP)
