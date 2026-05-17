@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.9] - 2026-05-18
+
+### Improved — high-confidence "Did you mean?" on free-form filter typos
+
+Filtering a free-form dim (licensee_name, postcode, business_state, etc.)
+with a typo previously returned 0 rows silently. Customer-impact: no
+hint that the filter value was wrong.
+
+Now: after applying a filter on a non-enum dim, if the result is empty
+AND difflib finds a HIGH-confidence close match (cutoff=0.7), raise a
+ValueError with the suggestion. Conservative cutoff preserves the
+empty-result contract for legitimately-absent values, unicode, random
+strings. Matches ato-mcp 0.8.13 design.
+
+254 unit tests pass.
+
 ## [0.6.8] - 2026-05-18
 
 ### Fixed — three-pool ranker breaks BUSINESS_NAMES/BANNED_ORGS tie

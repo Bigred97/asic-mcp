@@ -217,11 +217,35 @@ def _apply_filters(
                 )
             resolved = [translate_filter_value(cd, user_key, str(v).strip()) for v in user_val]
             mask = out[user_key].astype("string").isin(resolved)
+            unresolved_value = ", ".join(str(v).strip() for v in user_val)
         else:
             resolved = translate_filter_value(cd, user_key, str(user_val).strip())
             # Use string comparison so postcode (numeric in source) and "2600" both match.
             mask = out[user_key].astype("string") == str(resolved)
-        out = out.loc[mask]
+            unresolved_value = str(user_val).strip()
+        next_out = out.loc[mask]
+        # High-confidence "Did you mean?" for free-form dim typos.
+        # Cutoff 0.7 strict; matches ato-mcp 0.8.13 / aihw-mcp 0.4.13.
+        if next_out.empty and not out.empty:
+            dv = cd.dimension_values.get(user_key)
+            has_enum = dv is not None and dv.values
+            if not has_enum:
+                actual_values = out[user_key].dropna().astype(str).unique().tolist()
+                suggestion = difflib.get_close_matches(
+                    unresolved_value, actual_values, n=3, cutoff=0.7
+                )
+                if suggestion:
+                    others = (
+                        f" Other close matches: {', '.join(repr(s) for s in suggestion[1:])}."
+                        if len(suggestion) > 1
+                        else ""
+                    )
+                    raise ValueError(
+                        f"No matches for {unresolved_value!r} in {user_key!r} on dataset {cd.id!r}. "
+                        f"Did you mean {suggestion[0]!r}?{others} "
+                        f"Use the describe endpoint or describe tool for the full value list on {cd.id!r}."
+                    )
+        out = next_out
     return out.reset_index(drop=True)
 
 
