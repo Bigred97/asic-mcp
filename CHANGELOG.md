@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.7] - 2026-05-18
+
+### Improved — two-pool search ranker
+
+Replaced the WRatio-only ranker with a token_set_ratio high-signal +
+capped-WRatio description ranker. Mirrors abs-mcp / ato-mcp 0.8.10
+portfolio guard against the relevance-collapse-to-~57 problem.
+
+254 tests pass.
+
 ## [0.6.6] - 2026-05-18
 
 ### Added — `DatasetSummary.relevance` populated by `search_datasets()`
