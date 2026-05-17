@@ -5,6 +5,34 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.8] - 2026-05-18
+
+### Fixed — three-pool ranker breaks BUSINESS_NAMES/BANNED_ORGS tie
+
+Follow-up to 0.6.7: 'business name register' tied ASIC_BANNED_ORGS and
+ASIC_BUSINESS_NAMES at rel=100 because ASIC_BANNED_ORGS has a 'banned
+business name' keyword. Two-pool ranker (id+name+keywords as a single
+high-signal pool) couldn't distinguish, then clamp collapsed both to 100.
+
+Switched to a three-pool design:
+- `id+name` token_set_ratio is the PRIMARY discriminator (a curated
+  register's own name is the strongest semantic match — only
+  ASIC_BUSINESS_NAMES literally contains "business names")
+- Keywords broaden recall at reduced weight (KEYWORD_WEIGHT=0.4)
+- Description capped at 30
+- PHRASE_BONUS=15 when the literal query is a substring of the
+  keyword haystack
+- Proportional scaling against leader's raw — no pre-sort clamp
+
+Verification:
+- 'business name register' → ASIC_BUSINESS_NAMES at 100, ASIC_BANNED_ORGS 75.1
+- 'company directors' → ASIC_COMPANIES at 90.7 (was 3-way tied at 73.3)
+- 'banned persons' → ASIC_BANNED_PERSONS alone at 100
+- 'financial adviser' → ASIC_FINANCIAL_ADVISERS alone at 100
+- 'auditor' → ASIC_AUDITORS and ASIC_SMSF_AUDITORS tied 100 (CORRECT: both are auditor registers)
+
+254 unit tests pass.
+
 ## [0.6.7] - 2026-05-18
 
 ### Improved — two-pool search ranker
