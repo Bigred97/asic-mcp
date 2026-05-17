@@ -54,4 +54,7 @@ def search(query: str, limit: int = 10) -> list[DatasetSummary]:
         query, haystack, scorer=fuzz.WRatio, limit=max(limit, len(summaries))
     )
     ordered = sorted(matches, key=lambda m: -m[1])
-    return [summaries[idx] for _hay, _score, idx in ordered[:limit]]
+    return [
+        summaries[idx].model_copy(update={"relevance": round(float(score), 1)})
+        for _hay, score, idx in ordered[:limit]
+    ]

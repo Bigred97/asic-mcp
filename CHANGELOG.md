@@ -5,6 +5,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.6] - 2026-05-18
+
+### Added — `DatasetSummary.relevance` populated by `search_datasets()`
+
+`search_datasets()` results now carry their RapidFuzz WRatio score on
+the `relevance` field (0-100, rounded to 1dp). Previously discarded
+before returning. Gateway customers see no change; direct-MCP callers
+(Claude Code etc.) can now order their UI without re-running the
+fuzzy match.
+
+`relevance: None` when entry came from `list_curated()`.
+
 ## [0.6.5] - 2026-05-17
 
 ### Improved — transport-agnostic Field descriptions
