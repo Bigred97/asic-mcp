@@ -5,6 +5,14 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.10] - 2026-05-18
+
+### Fixed — CI lint failure (unused `rapidfuzz.process` import)
+
+0.6.9 release CI failed lint because the three-pool ranker refactor
+left `from rapidfuzz import fuzz, process` behind. Re-shipping with
+the import cleaned up. No runtime change vs 0.6.9.
+
 ## [0.6.9] - 2026-05-18
 
 ### Improved — high-confidence "Did you mean?" on free-form filter typos
