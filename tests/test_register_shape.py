@@ -126,14 +126,51 @@ def test_filter_list_or_semantics(afs_licensee_csv):
     assert states.issubset({"NSW", "VIC"})
 
 
-def test_filter_free_form_substring_match_fails_by_default(afs_licensee_csv):
-    """Free-form dimensions (licensee_name) use EXACT match — a substring
-    doesn't return matches unless it matches the full value."""
+def test_filter_id_role_full_name_returns_match(afs_licensee_csv):
+    """Full canonical name in an id-role filter returns the matching row."""
     cd, df = _load(afs_licensee_csv, "ASIC_AFS_LICENSEE")
-    # Use the full name of the first record
     first_name = df["AFS_LIC_NAME"].iloc[0]
     exact = _build(cd, df, filters={"licensee_name": first_name})
-    assert exact.row_count == 1
+    assert exact.row_count >= 1
+
+
+def test_filter_id_role_substring_case_insensitive(afs_licensee_csv):
+    """0.6.16+: bare id-role filters default to case-insensitive substring.
+
+    ASIC CSVs store names uppercased ('IPIB PTY LTD'). A customer searching
+    `licensee_name='ipib'` (lowercase, partial) must still find the row.
+    The previous behaviour (exact match only) silently returned 0 rows on
+    every realistic name query and was the bug behind 0.6.16.
+    """
+    cd, df = _load(afs_licensee_csv, "ASIC_AFS_LICENSEE")
+    first_name = str(df["AFS_LIC_NAME"].iloc[0])
+    # Use first 4 chars of the full name, lower-cased. Because the CSV is
+    # uppercase, this can only match if the comparison is case-insensitive
+    # AND substring-based.
+    needle = first_name[:4].lower()
+    assert needle != ""
+    resp = _build(cd, df, filters={"licensee_name": needle})
+    assert resp.row_count >= 1
+    names = {obs.dimensions.get("licensee_name", "") for obs in resp.records}
+    assert any(needle.upper() in n.upper() for n in names)
+
+
+def test_filter_id_role_wildcards_still_work(afs_licensee_csv):
+    """Trailing '*' / leading '*' / '~' suffix wildcards must still parse.
+
+    Back-compat for the 0.6.x convention. Whether the user writes
+    `'ipib'`, `'ipib*'`, `'*ipib*'`, or `'ipib~'`, the result is the same
+    case-insensitive contains match.
+    """
+    cd, df = _load(afs_licensee_csv, "ASIC_AFS_LICENSEE")
+    first_name = str(df["AFS_LIC_NAME"].iloc[0])
+    needle = first_name[:4].lower()
+    bare = _build(cd, df, filters={"licensee_name": needle})
+    trailing = _build(cd, df, filters={"licensee_name": needle + "*"})
+    leading = _build(cd, df, filters={"licensee_name": "*" + needle})
+    tilde = _build(cd, df, filters={"licensee_name": needle + "~"})
+    assert bare.row_count == trailing.row_count == leading.row_count == tilde.row_count
+    assert bare.row_count >= 1
 
 
 def test_filter_unknown_dimension_raises(afs_licensee_csv):

@@ -195,13 +195,30 @@ def _apply_filters(
         return df
 
     valid_dim_keys = {c.key for c in cd.columns.values() if c.role in ("dimension", "id")}
-    # id-role columns are free-form (entity names, ABNs, licence numbers) —
-    # customers querying by name typically want case-insensitive substring
-    # matching ('commonwealth bank' → COMMONWEALTH BANK OF AUSTRALIA), not
-    # exact match. Wildcards ('commonwealth*', '*bank*', 'commonwealth~')
-    # opt into contains-style matching; bare id values stay exact for
-    # backward compat.
-    id_role_keys = {c.key for c in cd.columns.values() if c.role == "id"}
+    # Free-form text columns (entity names, ABNs, licence numbers, business
+    # names) need case-insensitive substring matching by default. ASIC stores
+    # names uppercased ('ACME PTY LTD'), so an exact 'acme' match returns
+    # zero rows — surprising and useless. 0.6.16+: any role-id column, OR
+    # any role-dimension column without a curated `dimension_values` enum,
+    # defaults to case-insensitive contains. Enumerated dimensions (state,
+    # status, type — backed by `dimension_values:`) keep strict equality
+    # because their values are short canonical codes ('NSW', 'REGD') that
+    # should NOT match by substring (a 'NSW' filter must not catch
+    # 'NSWESTPAC' or other accidental substrings).
+    #
+    # Wildcards (*, ~) are still accepted for back-compat and explicit intent;
+    # they become a no-op in the bare-contains world but don't break callers.
+    # Lists keep exact-OR semantics — list inputs are typically full canonical
+    # IDs (e.g. ABNs, ACNs) where exact-match is the right call.
+    contains_keys = {
+        c.key
+        for c in cd.columns.values()
+        if c.role == "id" or (
+            c.role == "dimension"
+            and (cd.dimension_values.get(c.key) is None
+                 or cd.dimension_values[c.key].values is None)
+        )
+    }
     out = df
     for user_key, user_val in filters.items():
         if user_key not in valid_dim_keys:
@@ -215,7 +232,8 @@ def _apply_filters(
                 f"{'...' if len(valid) > 10 else ''}. "
                 f"Use the describe endpoint or describe tool to see all filter columns for {cd.id!r}."
             )
-        # Lists mean "OR" across values.
+        # Lists mean "OR" across values. Kept as exact-match on id-role
+        # columns so callers can deliberately whitelist e.g. specific ABNs.
         if isinstance(user_val, list):
             if not user_val:
                 raise ValueError(
@@ -227,22 +245,21 @@ def _apply_filters(
             unresolved_value = ", ".join(str(v).strip() for v in user_val)
         else:
             v_str = str(user_val).strip()
-            # Wildcard substring match for id-role columns (company_name,
-            # licensee_name, adviser_number, etc.). Matches apra-mcp's
-            # permissive wildcard pattern. Trailing '*', leading '*', or '~'
-            # all signal "substring contains, case-insensitive".
-            is_wildcard = (
-                user_key in id_role_keys
-                and (v_str.endswith("*") or v_str.startswith("*") or "~" in v_str)
-            )
-            if is_wildcard:
+            if user_key in contains_keys:
+                # Free-form column (id, or unenumerated dimension): default
+                # to case-insensitive substring. ASIC CSVs store names
+                # uppercased ('ACME PTY LTD') so a bare 'acme' must
+                # contains-match without ceremony. Wildcards ('foo*',
+                # '*foo*', 'foo~') are stripped and treated identically —
+                # back-compat for callers that adopted the 0.6.x
+                # explicit-wildcard convention.
                 needle = v_str.replace("*", "").replace("~", "").strip()
                 if not needle:
                     raise ValueError(
-                        f"Filter {user_key!r}: wildcard value reduced to empty "
+                        f"Filter {user_key!r}: value reduced to empty "
                         "after stripping '*' / '~'. Pass a substring to match, "
-                        f"e.g. {{{user_key!r}: 'commonwealth*'}} or "
-                        f"{{{user_key!r}: 'macquarie~'}}."
+                        f"e.g. {{{user_key!r}: 'commonwealth'}} or "
+                        f"{{{user_key!r}: 'macquarie'}}."
                     )
                 mask = out[user_key].astype("string").str.contains(
                     needle, case=False, na=False, regex=False,

@@ -174,6 +174,55 @@ async def test_server_streaming_path_with_mocked_client(
 
 
 @pytest.mark.asyncio
+async def test_company_name_case_insensitive_substring(
+    companies_csv_path, monkeypatch
+):
+    """Regression for 0.6.16: `company_name='acme'` must return rows.
+
+    Same root cause as the BUSINESS_NAMES bug: id-role columns used
+    `pc.equal` instead of `pc.match_substring` on bare values, which
+    against the uppercase 'ACME PTY LTD' source returned 0 rows.
+    """
+    cd = curated.get("ASIC_COMPANIES")
+
+    async def fake_fetch_to_file(self, url, dest_path, **kw):
+        import shutil
+        shutil.copyfile(companies_csv_path, dest_path)
+        return companies_csv_path.stat().st_size
+
+    async def fake_resolve(cd, client):
+        return "https://example.test/companies_acme_test.csv"
+
+    monkeypatch.setattr(
+        "asic_mcp.client.ASICClient.fetch_resource_to_file",
+        fake_fetch_to_file,
+    )
+    monkeypatch.setattr(
+        "asic_mcp.server._resolve_download_url", fake_resolve
+    )
+
+    df = await _fetch_and_parse_streaming(
+        cd, filters={"company_name": "acme"}
+    )
+    assert len(df) == 1
+    assert df["Company Name"].iloc[0] == "ACME PTY LTD"
+
+    df_mixed = await _fetch_and_parse_streaming(
+        cd, filters={"company_name": "MaCqUaRiE"}
+    )
+    assert len(df_mixed) == 1
+    assert df_mixed["Company Name"].iloc[0] == "MACQUARIE BANK LIMITED"
+
+    # Substring 'bank' should match the three bank rows.
+    df_bank = await _fetch_and_parse_streaming(
+        cd, filters={"company_name": "bank"}
+    )
+    assert len(df_bank) == 3
+
+    await reset_client_for_tests()
+
+
+@pytest.mark.asyncio
 async def test_server_streaming_path_uses_parquet_warm_cache(
     companies_csv_path, monkeypatch
 ):

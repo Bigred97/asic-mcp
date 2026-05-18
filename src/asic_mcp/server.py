@@ -546,11 +546,17 @@ def _build_arrow_filter_mask(batch, cd, filters):
     Returns a pyarrow.BooleanArray otherwise (rows that PASS all filters).
 
     Mirrors shaping._apply_filters semantics:
-      - id-role columns (company_name, acn, abn, etc.) accept wildcards
-        (`'*foo*'`, `'foo~'`) → case-insensitive substring match.
-      - Non-wildcard string values get exact-match equality after running
-        through translate_filter_value (so `'current'` → `'REGD'`).
-      - Lists are treated as OR-of-equalities.
+      - Free-form columns (id-role, or dimension-role without a curated
+        `dimension_values` enum) default to case-insensitive substring
+        match. ASIC CSVs store names uppercased ('ACME PTY LTD') so a bare
+        'acme' must contains-match. Wildcards (`'*foo*'`, `'foo~'`) are
+        stripped and treated identically — back-compat for callers that
+        adopted the 0.6.x explicit-wildcard convention.
+      - Enumerated dimensions (state, status, type) get exact-match
+        equality after running through translate_filter_value (so
+        `'current'` → `'REGD'`).
+      - Lists are treated as OR-of-equalities (deliberate whitelist of
+        canonical ids).
 
     Unknown filter keys are silently skipped here. shaping._apply_filters
     runs again on the small filtered DataFrame and surfaces the
@@ -560,7 +566,15 @@ def _build_arrow_filter_mask(batch, cd, filters):
     import pyarrow.compute as pc
 
     alias_to_source = {c.key: c.source_column for c in cd.columns.values()}
-    id_role_keys = {c.key for c in cd.columns.values() if c.role == "id"}
+    contains_keys = {
+        c.key
+        for c in cd.columns.values()
+        if c.role == "id" or (
+            c.role == "dimension"
+            and (cd.dimension_values.get(c.key) is None
+                 or cd.dimension_values[c.key].values is None)
+        )
+    }
 
     schema_names = set(batch.schema.names)
     masks = []
@@ -590,11 +604,11 @@ def _build_arrow_filter_mask(batch, cd, filters):
             continue
 
         v_str = str(value).strip()
-        is_wildcard = (
-            alias in id_role_keys
-            and (v_str.endswith("*") or v_str.startswith("*") or "~" in v_str)
-        )
-        if is_wildcard:
+        if alias in contains_keys:
+            # Free-form column: default to case-insensitive substring on
+            # the source column (which is all-uppercase in ASIC CSVs).
+            # Wildcards are stripped — they're a no-op in the bare-contains
+            # world but don't break callers who learnt the 0.6.x convention.
             needle = v_str.replace("*", "").replace("~", "").strip()
             if needle:
                 masks.append(pc.match_substring(col, needle, ignore_case=True))

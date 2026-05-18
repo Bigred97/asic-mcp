@@ -5,6 +5,39 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.16] - 2026-05-18
+
+### Fixed — id-role filters (business_name, company_name, licensee_name, …) now case-insensitive substring by default
+
+Customer audit on ausdata-api flagged
+`/v1/data/asic/ASIC_BUSINESS_NAMES?business_name=acme&limit=5` returning
+zero rows even though the ASIC register contains many businesses whose
+name includes "ACME". Root cause: id-role filter values without an
+explicit wildcard (`*` / `~`) dispatched to `pc.equal(col, "acme")`
+against an uppercase Arrow column — guaranteed empty because ASIC stores
+names like `ACME PTY LTD`.
+
+The wildcard-only contains semantics (introduced in 0.6.x) was the wrong
+default for an LLM-facing surface: agents and the gateway both pass bare
+strings. Same bug existed silently on `ASIC_COMPANIES.company_name` and
+`ASIC_AFS_LICENSEE.licensee_name` — anywhere a `role: id` column meets a
+free-form value.
+
+Fix in both `shaping._apply_filters` (small-file path) and
+`server._build_arrow_filter_mask` (streaming path): bare id-role filter
+values default to `pc.match_substring(..., ignore_case=True)` / pandas
+`.str.contains(..., case=False)`. Wildcards (`'acme*'`, `'*acme*'`,
+`'acme~'`) still parse — they're stripped and treated identically, so
+back-compat for callers who adopted the explicit-wildcard convention.
+Lists keep exact-OR semantics (`{"abn": ["12345...", "67890..."]}`)
+because lists are deliberate whitelists of canonical IDs.
+
+Regression tests added:
+- `tests/test_streaming_business_names.py::test_business_name_case_insensitive_substring`
+- `tests/test_streaming_companies.py::test_company_name_case_insensitive_substring`
+- `tests/test_register_shape.py::test_filter_id_role_substring_case_insensitive`
+- `tests/test_register_shape.py::test_filter_id_role_wildcards_still_work`
+
 ## [0.6.15] - 2026-05-18
 
 ### Fixed — ASIC_BUSINESS_NAMES now uses the streaming path (gateway 26.7s → sub-second)

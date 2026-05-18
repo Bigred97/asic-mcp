@@ -156,6 +156,77 @@ async def test_server_streaming_path_filter_pushdown_business_names(
 
 
 @pytest.mark.asyncio
+async def test_business_name_case_insensitive_substring(
+    business_names_csv_path, monkeypatch
+):
+    """Regression for 0.6.16: `business_name='acme'` must return rows.
+
+    The customer audit on 0.6.15 found that
+    `?business_name=acme&limit=5` returned 0 rows even though ASIC's
+    BUSINESS_NAMES register stores 'ACME TRADING' (uppercase). Root cause
+    was that id-role columns were dispatching to `pc.equal(col, "acme")`
+    against an uppercase Arrow column — guaranteed empty. The 0.6.16
+    fix swaps the default to `pc.match_substring(..., ignore_case=True)`
+    so bare values from the gateway just work.
+
+    The fixture above has `ACME TRADING` as row 1. This test pins that
+    lowercase 'acme' resolves it via the Arrow filter pushdown.
+    """
+    cd = curated.get("ASIC_BUSINESS_NAMES")
+
+    async def fake_fetch_to_file(self, url, dest_path, **kw):
+        import shutil
+        shutil.copyfile(business_names_csv_path, dest_path)
+        return business_names_csv_path.stat().st_size
+
+    async def fake_resolve(cd, client):
+        return "https://example.test/bn_acme_test.csv"
+
+    monkeypatch.setattr(
+        "asic_mcp.client.ASICClient.fetch_resource_to_file",
+        fake_fetch_to_file,
+    )
+    monkeypatch.setattr(
+        "asic_mcp.server._resolve_download_url", fake_resolve
+    )
+
+    # Lowercase, partial — must still hit ACME TRADING.
+    df = await _fetch_and_parse_streaming(
+        cd, filters={"business_name": "acme"}
+    )
+    assert len(df) >= 1
+    assert any("ACME" in v for v in df["BN_NAME"].astype("string").tolist())
+
+    # Mixed-case substring must also resolve.
+    df_mixed = await _fetch_and_parse_streaming(
+        cd, filters={"business_name": "AcMe"}
+    )
+    assert len(df_mixed) == len(df)
+
+    # And the explicit-wildcard form (back-compat with 0.6.x callers)
+    # produces the same result.
+    df_wild = await _fetch_and_parse_streaming(
+        cd, filters={"business_name": "acme*"}
+    )
+    assert len(df_wild) == len(df)
+
+    # Substring 'sydney' must catch 'SYDNEY CONSULTING' regardless of case.
+    df_syd = await _fetch_and_parse_streaming(
+        cd, filters={"business_name": "sydney"}
+    )
+    assert len(df_syd) == 1
+    assert df_syd["BN_NAME"].iloc[0] == "SYDNEY CONSULTING"
+
+    # Negative: a needle that exists in NO row must return zero.
+    df_none = await _fetch_and_parse_streaming(
+        cd, filters={"business_name": "zzzz_not_in_register_zzzz"}
+    )
+    assert len(df_none) == 0
+
+    await reset_client_for_tests()
+
+
+@pytest.mark.asyncio
 async def test_server_streaming_path_uses_parquet_warm_cache_business_names(
     business_names_csv_path, monkeypatch
 ):
