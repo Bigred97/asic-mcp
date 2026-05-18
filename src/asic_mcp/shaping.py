@@ -195,6 +195,13 @@ def _apply_filters(
         return df
 
     valid_dim_keys = {c.key for c in cd.columns.values() if c.role in ("dimension", "id")}
+    # id-role columns are free-form (entity names, ABNs, licence numbers) —
+    # customers querying by name typically want case-insensitive substring
+    # matching ('commonwealth bank' → COMMONWEALTH BANK OF AUSTRALIA), not
+    # exact match. Wildcards ('commonwealth*', '*bank*', 'commonwealth~')
+    # opt into contains-style matching; bare id values stay exact for
+    # backward compat.
+    id_role_keys = {c.key for c in cd.columns.values() if c.role == "id"}
     out = df
     for user_key, user_val in filters.items():
         if user_key not in valid_dim_keys:
@@ -219,10 +226,33 @@ def _apply_filters(
             mask = out[user_key].astype("string").isin(resolved)
             unresolved_value = ", ".join(str(v).strip() for v in user_val)
         else:
-            resolved = translate_filter_value(cd, user_key, str(user_val).strip())
-            # Use string comparison so postcode (numeric in source) and "2600" both match.
-            mask = out[user_key].astype("string") == str(resolved)
-            unresolved_value = str(user_val).strip()
+            v_str = str(user_val).strip()
+            # Wildcard substring match for id-role columns (company_name,
+            # licensee_name, adviser_number, etc.). Matches apra-mcp's
+            # permissive wildcard pattern. Trailing '*', leading '*', or '~'
+            # all signal "substring contains, case-insensitive".
+            is_wildcard = (
+                user_key in id_role_keys
+                and (v_str.endswith("*") or v_str.startswith("*") or "~" in v_str)
+            )
+            if is_wildcard:
+                needle = v_str.replace("*", "").replace("~", "").strip()
+                if not needle:
+                    raise ValueError(
+                        f"Filter {user_key!r}: wildcard value reduced to empty "
+                        "after stripping '*' / '~'. Pass a substring to match, "
+                        f"e.g. {{{user_key!r}: 'commonwealth*'}} or "
+                        f"{{{user_key!r}: 'macquarie~'}}."
+                    )
+                mask = out[user_key].astype("string").str.contains(
+                    needle, case=False, na=False, regex=False,
+                )
+                unresolved_value = v_str
+            else:
+                resolved = translate_filter_value(cd, user_key, v_str)
+                # Use string comparison so postcode (numeric in source) and "2600" both match.
+                mask = out[user_key].astype("string") == str(resolved)
+                unresolved_value = v_str
         next_out = out.loc[mask]
         # High-confidence "Did you mean?" for free-form dim typos.
         # Cutoff 0.7 strict; matches ato-mcp 0.8.13 / aihw-mcp 0.4.13.

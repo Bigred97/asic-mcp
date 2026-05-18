@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.12] - 2026-05-18
+
+### Added — case-insensitive substring matching on company/entity name filters
+
+Customer-sim flagged `ASIC_COMPANIES.get_data(filters={company_name:
+'commonwealth bank'})` returning 0 rows because the filter required
+exact-case full-name match. KYB/legal-tech workflows need partial-name
+search.
+
+`id`-role columns (company_name, licensee_name, adviser_number,
+auditor_name, etc.) now accept wildcard substring matching:
+- `'commonwealth*'` — starts with "commonwealth" (case-insensitive)
+- `'*bank*'` — contains "bank" anywhere
+- `'commonwealth~'` — equivalent to `*commonwealth*`
+- exact-name passes unchanged (`'COMMONWEALTH BANK OF AUSTRALIA'`
+  still returns 1 row by exact match)
+
+Matches apra-mcp's `permissive` wildcard pattern.
+
+Verification:
+- `company_name='commonwealth*'` → 5 of 52 matches (truncated)
+- `company_name='*bank*'` → 5 of 2,227 matches
+- `company_name='macquarie*'` → 5 of 1,365 matches
+
+254 unit tests pass.
+
 ## [0.6.11] - 2026-05-18
 
 ### Fixed — short-query ranker misses ('ABN', 'SMSF', 'auditor')
