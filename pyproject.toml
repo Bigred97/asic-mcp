@@ -4,7 +4,7 @@ build-backend = "hatchling.build"
 
 [project]
 name = "asic-mcp"
-version = "0.6.14"
+version = "0.6.15"
 description = "MCP server for Australian Securities and Investments Commission registers. Plain-English access to financial advisers, AFS licensees, credit licensees, banned and disqualified persons and organisations, and registered liquidators via data.gov.au."
 readme = "README.md"
 requires-python = ">=3.11"

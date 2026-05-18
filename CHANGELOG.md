@@ -5,6 +5,32 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.15] - 2026-05-18
+
+### Fixed — ASIC_BUSINESS_NAMES now uses the streaming path (gateway 26.7s → sub-second)
+
+Customer audit on ausdata-api flagged `/v1/data/asic/ASIC_BUSINESS_NAMES?limit=2`
+timing out at 26.7s. Same root cause as ASIC_COMPANIES before 0.6.14: the
+~400 MB / 2.4M+ row CSV was being loaded via `pd.read_csv(BytesIO(body))`
+on the small-file path, blowing past the 512 MB Fly worker's RSS budget and
+serialising every concurrent request behind a single ~25s parse.
+
+Fix: flip `streaming: true` on the curated YAML. The 3-layer pipeline added
+in 0.6.14 (HTTP streaming → tempfile, pyarrow block-CSV → Parquet, Arrow
+filter pushdown on chunked iter_batches) is fully data-driven from the
+`streaming` flag, so no new code was needed — only the YAML opt-in and a
+regression test mirroring `test_streaming_companies.py`.
+
+Operators running ausdata-api should add `ASIC_BUSINESS_NAMES` to the warmup
+list alongside `ASIC_COMPANIES`:
+
+```bash
+asic-mcp --warmup --warmup-only ASIC_COMPANIES,ASIC_BUSINESS_NAMES
+```
+
+The cold path is ~40-60s for BUSINESS_NAMES; warming at boot keeps the
+customer-visible latency under 1s for filtered `latest()` calls.
+
 ## [0.6.14] - 2026-05-18
 
 ### Fixed — ASIC_COMPANIES OOM cascade (worker RSS 1.65 GB → ~470 MB)
