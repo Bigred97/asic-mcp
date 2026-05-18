@@ -91,6 +91,14 @@ class CuratedDataset:
     # with the candidate date string. download_url is the literal fallback.
     url_template: str | None = None
     url_template_lookback_days: int = 10
+    # When True, the server uses the streaming HTTP → tempfile → pyarrow
+    # CSV → Parquet path instead of loading the body bytes into memory.
+    # Bypasses the SQLite byte cache (storing 600 MB blobs there is bad);
+    # the persistent cache is the on-disk Parquet under parquet_cache.
+    # Set to True on the very largest CSV datasets only (ASIC_COMPANIES
+    # ~600 MB is the only one as of 0.6.14). Everything else stays on
+    # the small-file `read_csv` path. See parsing.stream_csv_to_parquet.
+    streaming: bool = False
 
 
 _REGISTRY: dict[str, CuratedDataset] | None = None
@@ -180,6 +188,7 @@ def _load_one(path: Path) -> CuratedDataset:
         discovery=discovery_raw,
         url_template=raw.get("url_template"),
         url_template_lookback_days=int(raw.get("url_template_lookback_days", 10)),
+        streaming=bool(raw.get("streaming", False)),
     )
 
 

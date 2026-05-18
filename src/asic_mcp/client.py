@@ -15,6 +15,7 @@ import asyncio
 import json
 import time
 from contextvars import ContextVar
+from pathlib import Path
 from typing import Any
 
 import httpx
@@ -97,6 +98,64 @@ class ASICClient:
         if not url.startswith(("http://", "https://")):
             raise ASICAPIError(f"Refusing to fetch non-http(s) URL: {url!r}")
         return await self._fetch_cached(url, kind=kind)
+
+    async def fetch_resource_to_file(
+        self,
+        url: str,
+        dest_path: Path,
+        *,
+        chunk_size: int = 1024 * 1024,
+    ) -> int:
+        """Stream a resource to a local file, returning total bytes written.
+
+        Use this for very large CSVs (ASIC_COMPANIES ~600 MB) where
+        loading the body into memory via `fetch_resource` blows past
+        the 512 MB Fly worker budget.
+
+        Bypasses both the SQLite body cache (storing 600 MB blobs in
+        SQLite is its own problem) and the in-flight dedupe (callers
+        of the streaming path are expected to gate concurrency at the
+        prewarm layer).
+
+        Args:
+            url: data.gov.au resource URL. Must be http(s).
+            dest_path: local path to write the body to. Created with
+                parent directories; replaced if it exists.
+            chunk_size: bytes per write. Default 1 MB.
+
+        Returns:
+            Total bytes written.
+
+        Raises:
+            ASICAPIError: non-2xx upstream response or network failure.
+        """
+        if not url.startswith(("http://", "https://")):
+            raise ASICAPIError(f"Refusing to fetch non-http(s) URL: {url!r}")
+        dest_path.parent.mkdir(parents=True, exist_ok=True)
+        tmp_path = dest_path.with_suffix(dest_path.suffix + ".part")
+        total = 0
+        try:
+            async with self._http.stream("GET", url) as resp:
+                try:
+                    resp.raise_for_status()
+                except httpx.HTTPStatusError as e:
+                    raise ASICAPIError(
+                        f"data.gov.au returned {e.response.status_code} for {url}"
+                    ) from e
+                with open(tmp_path, "wb") as fp:
+                    async for chunk in resp.aiter_bytes(chunk_size=chunk_size):
+                        fp.write(chunk)
+                        total += len(chunk)
+            tmp_path.replace(dest_path)
+            return total
+        except httpx.RequestError as e:
+            raise ASICAPIError(f"data.gov.au request failed: {e}") from e
+        finally:
+            if tmp_path.is_file():
+                try:
+                    tmp_path.unlink()
+                except OSError:
+                    pass
 
     async def head_ok(self, url: str) -> bool:
         """Cheap probe — return True if the URL responds 2xx to a HEAD.

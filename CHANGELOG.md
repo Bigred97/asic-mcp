@@ -5,6 +5,68 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.14] - 2026-05-18
+
+### Fixed — ASIC_COMPANIES OOM cascade (worker RSS 1.65 GB → ~470 MB)
+
+Backend gateway flagged that any `/v1/data/asic/ASIC_COMPANIES` call
+trapped the 512 MB Fly worker RSS at ~1.65 GB → OOM kill → 502 to the
+customer. Filter pushdown didn't help because the filter was applied
+AFTER the full 600 MB / 3.5 M-row CSV was loaded via
+`pd.read_csv(BytesIO(body))`.
+
+Three-layer fix, all needed:
+
+1. **Streaming HTTP → tempfile** (`client.fetch_resource_to_file`).
+   New httpx.stream() variant writes 1 MB chunks to disk. The 600 MB
+   body never lives in memory at the client layer.
+
+2. **Streaming CSV → Parquet conversion** (`parsing.stream_csv_to_parquet`).
+   `pyarrow.csv.open_csv()` block-iterator (8 MB blocks) → `ParquetWriter`
+   batch-by-batch. Peak resident memory during conversion: ~80 MB
+   regardless of source size. Result: ~126 MB Parquet on disk.
+
+3. **Arrow-level filter pushdown** (`server._read_parquet_filtered`).
+   Chunked `pq.ParquetFile.iter_batches(batch_size=200_000)` applying
+   `pyarrow.compute` predicates per batch. Substring filters use
+   `pc.match_substring(ignore_case=True)`; exact filters use
+   `pc.equal` / `pc.is_in`. Only matching rows ever land in pandas.
+
+Memory profile (live `latest(ASIC_COMPANIES, filters={...}, limit=5)`):
+- WARM path (parquet exists): **~470 MB peak RSS, 0.6-1.0s** ✓ under 512 MB
+- COLD path (no parquet): **~640 MB peak RSS, ~17s** — recommend
+  prewarm before customer traffic to make this a one-time event
+- Original (0.6.13): **~1855 MB peak RSS, 36s** ❌ OOM
+
+### Added — `prewarm_curated()` + `--warmup` CLI
+
+Same shape as ato 0.8.21 / apra 0.8.19 / wgea 0.6.11 / aemo 0.4.14 /
+abs 0.11.14. `asic-mcp --warmup --warmup-only ASIC_COMPANIES` warms
+the on-disk Parquet cache before customers can land on the cold path.
+Per-dataset error isolation + bounded concurrency (default 2).
+
+### Added — `streaming: true` curated YAML flag
+
+Per-dataset opt-in for the streaming pipeline. Only ASIC_COMPANIES
+uses it as of 0.6.14; smaller registers (AFS Licensee, Financial
+Advisers, etc.) stay on the existing `pd.read_csv` path which is
+already memory-bounded for files under ~50 MB.
+
+### Added — `parquet_cache.py` (~/.asic-mcp/parquet-cache/, 14d TTL)
+
+Persistent on-disk Parquet cache + 14-day TTL (matching ASIC's
+weekly snapshot cadence + slack). `read_stale()` returns the cached
+frame regardless of TTL for graceful-degradation fallback when
+data.gov.au is unreachable. Cache dir overridable via
+`ASIC_MCP_PARQUET_CACHE_DIR`.
+
+### Dependencies
+
+- Added `pyarrow>=15` (already in wgea/aihw/ato/apra deps).
+
+274 unit tests pass (+20 new): streaming parsing, parquet cache TTL
++ stale fallback, server-level filter pushdown, prewarm semantics.
+
 ## [0.6.13] - 2026-05-18
 
 ### Improved — year-range hint instead of misleading fuzzy match

@@ -19,24 +19,30 @@ import asyncio
 import difflib
 import hashlib
 import re
+import tempfile
+import time
 from collections import OrderedDict
 from datetime import date, timedelta
+from pathlib import Path
 from typing import Annotated, Any, Literal
 
 import pandas as pd
 from fastmcp import FastMCP
 from pydantic import Field
 
-from . import catalog, curated
+from . import catalog, curated, parquet_cache
 from .client import (
     ASICAPIError,
     ASICClient,
     get_stale_signal,
     reset_stale_signal,
 )
+from .client import (
+    _mark_stale as _mark_stale_signal,
+)
 from .discovery import DiscoveryError, DiscoverySpec, resolve_latest_url
 from .models import ColumnDetail, DataResponse, DatasetDetail, DatasetSummary
-from .parsing import drop_blank_rows, read_csv, read_xlsx
+from .parsing import ParseError, drop_blank_rows, read_csv, read_xlsx, stream_csv_to_parquet
 from .shaping import build_response
 
 # Curated IDs are uppercase letters + digits + underscore.
@@ -59,8 +65,12 @@ _df_cache_lock = asyncio.Lock()
 
 
 def reset_df_cache_for_tests() -> None:
-    """Drop the parsed-DataFrame cache. Tests use this to start from clean."""
+    """Drop the parsed-DataFrame cache + on-disk Parquet cache.
+
+    Tests use this to start from clean.
+    """
     _df_cache.clear()
+    parquet_cache.reset_for_tests()
 
 
 async def _get_client() -> ASICClient:
@@ -238,13 +248,31 @@ async def _resolve_dated_url(cd: curated.CuratedDataset, client: ASICClient) -> 
     return cd.download_url
 
 
-async def _fetch_and_parse(cd: curated.CuratedDataset, *, kind: str = "data"):
+async def _fetch_and_parse(
+    cd: curated.CuratedDataset,
+    *,
+    kind: str = "data",
+    filters: dict[str, Any] | None = None,
+):
     """Download the dataset's primary resource and parse it into a DataFrame.
 
     The parsed DataFrame is cached in-process keyed by (url, parse-spec, body
     content hash). The hash makes the cache content-aware: if the byte cache
     serves stale bytes that get refreshed, the hash differs and we re-parse.
+
+    `filters` is consumed only by the streaming path. The small-file path
+    keeps the existing "load the whole frame, filter in shaping" model so
+    its byte and df caches remain content-keyed rather than filter-keyed.
+
+    For datasets flagged `streaming: true` in the curated YAML (ASIC_COMPANIES
+    is the only one as of 0.6.14), we dispatch to `_fetch_and_parse_streaming`
+    which bypasses the SQLite byte cache and uses chunked Arrow filter
+    pushdown directly on the on-disk Parquet — peak memory ~80 MB regardless
+    of source size or query shape.
     """
+    if cd.streaming:
+        return await _fetch_and_parse_streaming(cd, filters=filters or {})
+
     client = await _get_client()
     url = await _resolve_download_url(cd, client)
     try:
@@ -310,6 +338,283 @@ async def _fetch_and_parse(cd: curated.CuratedDataset, *, kind: str = "data"):
             _df_cache.popitem(last=False)
 
     return df
+
+
+# Hard cap on rows returned by a streaming-path call when no filter narrows
+# the set. Prevents `get_data(ASIC_COMPANIES)` (no filter) from materialising
+# all 4.3M rows. Mirrors the `_HARD_MAX_RECORDS` convention used in the
+# bigger sisters. Latest()'s `limit` kwarg caps it further on the response side.
+_STREAMING_HARD_MAX_RECORDS = 100_000
+
+# Arrow batch size for chunked parquet reads. ~200k rows per batch keeps
+# peak memory per batch under ~80 MB even with all 11 ASIC_COMPANIES
+# columns held simultaneously, while keeping iteration overhead low.
+_STREAMING_BATCH_SIZE = 200_000
+
+
+async def _fetch_and_parse_streaming(
+    cd: curated.CuratedDataset,
+    *,
+    filters: dict[str, Any] | None = None,
+) -> pd.DataFrame:
+    """Streaming variant for very large CSVs (ASIC_COMPANIES, ~600 MB).
+
+    Pipeline:
+      1. Resolve current download URL via CKAN discovery (same as small-file path).
+      2. Ensure the on-disk Parquet cache is fresh (cold path: httpx.stream
+         → tempfile → pyarrow CSV → ParquetWriter). The Parquet file IS the
+         persistent cache for streaming datasets — we do not keep the
+         materialised DataFrame in-process because for ASIC_COMPANIES that
+         frame is ~480 MB (pyarrow-backed) and blows past Fly's 512 MB
+         worker on its own.
+      3. Apply filters at the Arrow level via batched parquet read. Peak
+         resident memory per batch: ~80 MB. Matching rows are accumulated
+         (typically <1 MB total for register lookups) and converted to a
+         small pandas DataFrame.
+
+    Graceful degradation: if the HTTP stream fails and the on-disk Parquet
+    exists at all (regardless of TTL), serve from it and set the stale
+    signal so `DataResponse.stale` / `.stale_reason` get populated.
+    """
+    client = await _get_client()
+    url = await _resolve_download_url(cd, client)
+
+    # Project to the source columns the curated YAML actually exposes.
+    # Skipping unprojected columns at the pyarrow read stage is what makes
+    # the 600 MB ASIC_COMPANIES CSV tractable.
+    projected_cols = sorted({c.source_column for c in cd.columns.values()})
+
+    cache_key = (
+        "streaming-v1",
+        url,
+        cd.format,
+        tuple(projected_cols),
+    )
+    parquet_path = parquet_cache.path_for(cache_key)
+
+    # If the on-disk parquet is missing or stale, refresh it.
+    parquet_fresh = False
+    if parquet_path.is_file():
+        try:
+            age = time.time() - parquet_path.stat().st_mtime
+            parquet_fresh = age <= parquet_cache.DEFAULT_TTL_SECONDS
+        except OSError:
+            parquet_fresh = False
+
+    stale_fallback_in_use = False
+    if not parquet_fresh:
+        tmp_dir = Path(tempfile.gettempdir()) / "asic-mcp-streaming"
+        tmp_dir.mkdir(parents=True, exist_ok=True)
+        tmp_csv = tmp_dir / (
+            hashlib.sha256(url.encode("utf-8")).hexdigest()[:16] + ".csv"
+        )
+        try:
+            try:
+                await client.fetch_resource_to_file(url, tmp_csv)
+            except ASICAPIError as e:
+                # Graceful degradation: parquet exists but is past TTL
+                # AND the live fetch failed → serve the stale parquet.
+                if parquet_path.is_file():
+                    try:
+                        age_min = max(
+                            0,
+                            int((time.time() - parquet_path.stat().st_mtime) / 60),
+                        )
+                    except OSError:
+                        age_min = -1
+                    _mark_stale_signal(
+                        f"streaming fetch failed ({type(e).__name__}) for "
+                        f"{cd.id}; serving stale Parquet cache from "
+                        f"~{age_min} minute(s) ago"
+                    )
+                    stale_fallback_in_use = True
+                else:
+                    raise ValueError(
+                        f"Could not stream dataset {cd.id} from data.gov.au "
+                        f"({e}). data.gov.au is the upstream — transient "
+                        "5xx / DNS errors usually clear on retry within a "
+                        f"few minutes. No cached Parquet available for "
+                        f"{cd.id}; try again shortly or visit {cd.source_url}."
+                    ) from e
+
+            if not stale_fallback_in_use:
+                try:
+                    await asyncio.to_thread(
+                        stream_csv_to_parquet,
+                        tmp_csv,
+                        parquet_path,
+                        columns=projected_cols,
+                    )
+                except ParseError as e:
+                    raise ValueError(
+                        f"Could not parse streamed dataset {cd.id}: {e}. "
+                        "The upstream file may have changed shape — flag at "
+                        "https://github.com/Bigred97/asic-mcp/issues."
+                    ) from e
+        finally:
+            if tmp_csv.is_file():
+                try:
+                    tmp_csv.unlink()
+                except OSError:
+                    pass
+
+    if not parquet_path.is_file():
+        raise ValueError(
+            f"Internal error: no Parquet cache for {cd.id} at {parquet_path} "
+            f"after streaming fetch. Check disk space at "
+            f"{parquet_cache.cache_dir()}."
+        )
+
+    return await asyncio.to_thread(
+        _read_parquet_filtered, parquet_path, cd, filters or {}
+    )
+
+
+def _read_parquet_filtered(
+    parquet_path: Path,
+    cd: curated.CuratedDataset,
+    filters: dict[str, Any],
+) -> pd.DataFrame:
+    """Chunked Arrow-level filter pushdown on the cached Parquet.
+
+    Iterates the parquet in ~200k-row RecordBatches, building a per-batch
+    boolean mask from the user's filters and keeping only matching rows.
+    Result is converted to a pandas DataFrame with `string[pyarrow]` dtype
+    so downstream shaping stays memory-efficient.
+
+    When `filters` is empty (`latest(ASIC_COMPANIES)` with no narrowing),
+    iteration stops after `_STREAMING_HARD_MAX_RECORDS` accumulated rows —
+    a full register dump is never the right query shape, and the cap
+    matches the convention used by ato/abs sisters.
+    """
+    import pyarrow as pa
+    import pyarrow.parquet as pa_parquet
+
+    pf = pa_parquet.ParquetFile(str(parquet_path))
+    matched_batches: list[pa.RecordBatch] = []
+    rows_total = 0
+    have_filters = bool(filters)
+
+    for batch in pf.iter_batches(batch_size=_STREAMING_BATCH_SIZE):
+        if have_filters:
+            mask = _build_arrow_filter_mask(batch, cd, filters)
+            if mask is None:
+                # No applicable filter columns landed in this batch
+                # (unlikely — they all land in every batch). Keep
+                # nothing; if every batch has no mask, the user's
+                # filter is invalid and shaping will surface that.
+                continue
+            filtered = batch.filter(mask)
+            if filtered.num_rows > 0:
+                matched_batches.append(filtered)
+                rows_total += filtered.num_rows
+        else:
+            # No filters — accumulate up to the hard cap.
+            remaining = _STREAMING_HARD_MAX_RECORDS - rows_total
+            if remaining <= 0:
+                break
+            if batch.num_rows > remaining:
+                matched_batches.append(batch.slice(0, remaining))
+                rows_total += remaining
+                break
+            matched_batches.append(batch)
+            rows_total += batch.num_rows
+
+    if not matched_batches:
+        # Empty result — build an empty frame with the right columns so
+        # _apply_aliases doesn't trip on missing source columns.
+        empty_schema = pf.schema_arrow
+        return pa.Table.from_batches([], schema=empty_schema).to_pandas(
+            types_mapper=pd.ArrowDtype
+        )
+
+    table = pa.Table.from_batches(matched_batches)
+    df = table.to_pandas(types_mapper=pd.ArrowDtype)
+
+    dim_source_cols = [
+        c.source_column for c in cd.columns.values() if c.role == "dimension"
+    ]
+    if dim_source_cols:
+        df = drop_blank_rows(df, dim_source_cols)
+    return df
+
+
+def _build_arrow_filter_mask(batch, cd, filters):
+    """Build an Arrow boolean mask for a RecordBatch from alias-keyed filters.
+
+    Returns None if no filter matched a known source column on this batch.
+    Returns a pyarrow.BooleanArray otherwise (rows that PASS all filters).
+
+    Mirrors shaping._apply_filters semantics:
+      - id-role columns (company_name, acn, abn, etc.) accept wildcards
+        (`'*foo*'`, `'foo~'`) → case-insensitive substring match.
+      - Non-wildcard string values get exact-match equality after running
+        through translate_filter_value (so `'current'` → `'REGD'`).
+      - Lists are treated as OR-of-equalities.
+
+    Unknown filter keys are silently skipped here. shaping._apply_filters
+    runs again on the small filtered DataFrame and surfaces the
+    "Filter X is not a column" / "Did you mean Y?" hints with full UX.
+    """
+    import pyarrow as pa
+    import pyarrow.compute as pc
+
+    alias_to_source = {c.key: c.source_column for c in cd.columns.values()}
+    id_role_keys = {c.key for c in cd.columns.values() if c.role == "id"}
+
+    schema_names = set(batch.schema.names)
+    masks = []
+    for alias, value in filters.items():
+        if alias not in alias_to_source:
+            continue
+        source_col = alias_to_source[alias]
+        if source_col not in schema_names:
+            continue
+        col = batch[source_col]
+
+        if isinstance(value, list):
+            resolved: list[str] = []
+            for v in value:
+                v_str = str(v).strip()
+                if not v_str:
+                    continue
+                try:
+                    resolved.append(
+                        str(curated.translate_filter_value(cd, alias, v_str))
+                    )
+                except ValueError:
+                    # Unknown value — let shaping surface the hint.
+                    pass
+            if resolved:
+                masks.append(pc.is_in(col, pa.array(resolved, type=pa.string())))
+            continue
+
+        v_str = str(value).strip()
+        is_wildcard = (
+            alias in id_role_keys
+            and (v_str.endswith("*") or v_str.startswith("*") or "~" in v_str)
+        )
+        if is_wildcard:
+            needle = v_str.replace("*", "").replace("~", "").strip()
+            if needle:
+                masks.append(pc.match_substring(col, needle, ignore_case=True))
+            continue
+
+        try:
+            resolved_value = curated.translate_filter_value(cd, alias, v_str)
+        except ValueError:
+            # Unknown alias value — skip the predicate; shaping will
+            # report the helpful "did you mean" error on the small
+            # filtered (probably empty) DataFrame.
+            continue
+        masks.append(pc.equal(col, pa.scalar(str(resolved_value))))
+
+    if not masks:
+        return None
+    mask = masks[0]
+    for m in masks[1:]:
+        mask = pc.and_(mask, m)
+    return mask
 
 
 @mcp.tool
@@ -523,7 +828,13 @@ async def _get_data_impl(
     if end_v:
         user_query["end_period"] = end_v
 
-    df = await _fetch_and_parse(cd, kind=cd.cache_kind)  # type: ignore[arg-type]
+    df = await _fetch_and_parse(
+        cd, kind=cd.cache_kind, filters=filters_d  # type: ignore[arg-type]
+    )
+    # Streaming-path datasets have already applied filters at the parquet
+    # level via Arrow predicate pushdown. Re-running them in shaping is a
+    # no-op on the small filtered frame, but we still pass `filters_d`
+    # through so the validation + "did you mean" hints fire on bad inputs.
     resp = build_response(
         cd=cd,
         df=df,
@@ -773,7 +1084,130 @@ def list_curated() -> list[str]:
     return curated.list_ids()
 
 
+async def prewarm_curated(
+    dataset_ids: list[str] | None = None,
+    *,
+    max_concurrency: int = 2,
+    log: Any = None,
+) -> dict[str, str]:
+    """Warm the on-disk Parquet + SQLite cache for curated ASIC datasets with
+    bounded concurrency. Designed for gateway / Fly-worker startup.
+
+    The big one is ASIC_COMPANIES — 600 MB streaming download, ~60-90s cold
+    convert to Parquet, ~80 MB resident at peak. Warming this at init means
+    customer cold-call latency drops from ~90s to sub-200ms.
+
+    Mirrors abs-mcp 0.11.14 / ato-mcp 0.8.21 / apra-mcp 0.8.19 / wgea-mcp
+    0.6.11 / aemo-mcp 0.4.14's `prewarm_curated()` signature so gateway init
+    hooks can call all five sisters with the same shape.
+
+    Parameters
+    ----------
+    dataset_ids:
+        Curated dataset IDs to warm. Defaults to every curated dataset
+        (`curated.list_ids()`). Unknown IDs raise ValueError.
+    max_concurrency:
+        Semaphore size. Default 2 (sized for 512MB worker). Bump to 4 on
+        1 GB+ workers; ASIC_COMPANIES is by far the biggest member so
+        even at conc=1 the prewarm completes in ~3 minutes for the full
+        suite.
+    log:
+        Optional callable accepting a single string for progress lines.
+
+    Returns
+    -------
+    Dict mapping dataset_id → "ok" / "error: ...". Errors are caught
+    per-dataset so one failure doesn't abort the rest.
+    """
+    if dataset_ids is None:
+        dataset_ids = curated.list_ids()
+    known = set(curated.list_ids())
+    unknown = [d for d in dataset_ids if d not in known]
+    if unknown:
+        raise ValueError(
+            f"prewarm_curated received unknown dataset IDs: {unknown}. "
+            f"Valid IDs: {sorted(known)}."
+        )
+
+    sem = asyncio.Semaphore(max(1, int(max_concurrency)))
+    results: dict[str, str] = {}
+
+    async def _warm_one(ds_id: str) -> None:
+        async with sem:
+            if log:
+                log(f"[asic-mcp prewarm] warming {ds_id}")
+            try:
+                # Use latest() — same path the gateway hits. The default
+                # limit=50 keeps response size sane while still exercising
+                # the full fetch → parse → cache pipeline.
+                await latest(dataset_id=ds_id)
+                results[ds_id] = "ok"
+                if log:
+                    log(f"[asic-mcp prewarm] done    {ds_id}")
+            except Exception as e:
+                msg = f"{type(e).__name__}: {e!s}"[:200]
+                results[ds_id] = f"error: {msg}"
+                if log:
+                    log(f"[asic-mcp prewarm] FAILED  {ds_id}: {msg}")
+
+    await asyncio.gather(*[_warm_one(d) for d in dataset_ids])
+    return results
+
+
 def main() -> None:
+    import argparse
+    import sys
+
+    parser = argparse.ArgumentParser(
+        prog="asic-mcp",
+        description="MCP server for the Australian Securities and Investments Commission registers.",
+    )
+    parser.add_argument(
+        "--warmup",
+        action="store_true",
+        help=(
+            "Warm the curated-dataset cache and exit. Use from gateway "
+            "startup hooks to avoid OOM cascade on memory-constrained "
+            "workers. Honours --warmup-concurrency (default 2). The big "
+            "one is ASIC_COMPANIES (~600 MB streaming download, ~80 MB "
+            "resident peak); with --warmup the customer's first call "
+            "lands on a warm Parquet cache."
+        ),
+    )
+    parser.add_argument(
+        "--warmup-concurrency",
+        type=int,
+        default=2,
+        help="Max parallel dataflow warms when --warmup is set (default 2).",
+    )
+    parser.add_argument(
+        "--warmup-only",
+        type=str,
+        default=None,
+        help=(
+            "Comma-separated curated dataset IDs to warm. Defaults to every "
+            "curated dataset. Example: --warmup-only ASIC_COMPANIES,ASIC_FINANCIAL_ADVISERS"
+        ),
+    )
+    args = parser.parse_args()
+
+    if args.warmup:
+        ds_ids: list[str] | None = None
+        if args.warmup_only:
+            ds_ids = [s.strip() for s in args.warmup_only.split(",") if s.strip()]
+        results = asyncio.run(prewarm_curated(
+            ds_ids,
+            max_concurrency=args.warmup_concurrency,
+            log=lambda m: print(m, file=sys.stderr, flush=True),
+        ))
+        fails = {k: v for k, v in results.items() if not v.startswith("ok")}
+        if fails:
+            print(
+                f"[asic-mcp prewarm] {len(fails)} dataset(s) failed: {sorted(fails)}",
+                file=sys.stderr,
+            )
+        sys.exit(1 if fails else 0)
+
     mcp.run(transport="stdio")
 
 

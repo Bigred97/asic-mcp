@@ -20,6 +20,13 @@ format: csv
 header_row: 1
 layout: wide
 cache_kind: register
+# True streaming path: the source CSV (~600 MB / 3.5 M rows) is downloaded
+# via httpx.stream() to a tempfile, then converted to Parquet via pyarrow's
+# block-iterator CSV reader (peak memory ~50 MB regardless of source size).
+# Subsequent reads use pd.read_parquet(columns=[...]) for column-projected
+# loads (~80 MB peak). Without this flag pd.read_csv on the 600 MB body
+# OOMs a 512 MB Fly worker. Added in 0.6.14.
+streaming: true
 search_keywords:
   - company register
   - acn
