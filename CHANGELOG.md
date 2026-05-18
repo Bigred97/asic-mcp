@@ -5,6 +5,16 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.6.13] - 2026-05-18
+
+### Improved — year-range hint instead of misleading fuzzy match
+
+For year-shaped dims (4-digit numeric), filter typo errors now report
+the valid range AND the direction of the miss instead of fuzzy-matching
+to a similar number. Matches aihw 0.4.16 / ato 0.8.18 / apra 0.8.18.
+
+254 unit tests pass.
+
 ## [0.6.12] - 2026-05-18
 
 ### Added — case-insensitive substring matching on company/entity name filters

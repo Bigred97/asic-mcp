@@ -261,6 +261,34 @@ def _apply_filters(
             has_enum = dv is not None and dv.values
             if not has_enum:
                 actual_values = out[user_key].dropna().astype(str).unique().tolist()
+                # Year-shaped dims get range hints instead of fuzzy
+                # suggestions ('2022' → '2002' is misleading).
+                user_int = None
+                if unresolved_value.isdigit() and len(unresolved_value) == 4:
+                    try:
+                        user_int = int(unresolved_value)
+                    except ValueError:
+                        pass
+                actual_ints: list[int] = []
+                if user_int is not None:
+                    for v in actual_values:
+                        if v.isdigit() and len(v) == 4:
+                            try:
+                                actual_ints.append(int(v))
+                            except ValueError:
+                                continue
+                if user_int is not None and actual_ints and user_int not in actual_ints:
+                    lo, hi = min(actual_ints), max(actual_ints)
+                    direction = (
+                        f"requested {user_int} is BEFORE the earliest published year"
+                        if user_int < lo else
+                        f"requested {user_int} is AFTER the latest published year"
+                    )
+                    raise ValueError(
+                        f"No data for {user_key}={user_int} on dataset {cd.id!r}. "
+                        f"Valid range: {lo}-{hi} — {direction}. "
+                        f"Use the describe endpoint or describe tool to see the full value list on {cd.id!r}."
+                    )
                 suggestion = difflib.get_close_matches(
                     unresolved_value, actual_values, n=3, cutoff=0.7
                 )
