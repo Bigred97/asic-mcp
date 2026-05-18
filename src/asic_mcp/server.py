@@ -20,6 +20,7 @@ import difflib
 import hashlib
 import re
 import tempfile
+import threading
 import time
 from collections import OrderedDict
 from datetime import date, timedelta
@@ -53,8 +54,12 @@ _VALID_FORMATS = {"records", "series", "csv"}
 
 mcp = FastMCP("asic-mcp")
 
-_client: ASICClient | None = None
-_client_lock = asyncio.Lock()
+# Per-thread client cache. The gateway runs MCP tools from worker threads,
+# each with its own asyncio event loop. A module-level singleton holding httpx
+# state from a previous (now-closed) loop raises ``RuntimeError: Event loop is
+# closed``. ``threading.local()`` gives each thread its own client bound to
+# whichever loop is current on that thread when it's first constructed.
+_thread_local = threading.local()
 
 # Parsed-DataFrame cache. The byte cache short-circuits the network; this
 # avoids re-parsing CSV/XLSX bytes on every warm call (~hundreds of ms even
@@ -74,22 +79,39 @@ def reset_df_cache_for_tests() -> None:
 
 
 async def _get_client() -> ASICClient:
-    global _client
-    async with _client_lock:
-        if _client is None:
-            _client = ASICClient()
-        return _client
+    """Return the per-thread client, constructing it on first use.
+
+    Each worker thread gets its own ASICClient bound to its own event
+    loop. Required because gateways like ausdata-api invoke us from
+    worker threads with fresh asyncio loops per call (``asyncio.run()``);
+    a module-global client would bind to the first loop and fail on
+    subsequent calls with ``RuntimeError: Event loop is closed``.
+    """
+    client = getattr(_thread_local, "client", None)
+    if client is None:
+        client = ASICClient()
+        _thread_local.client = client
+    return client
 
 
 async def reset_client_for_tests() -> None:
-    """Drop the cached client. Tests that span event loops must clear it."""
-    global _client
-    if _client is not None:
+    """Drop the current thread's cached client.
+
+    The server keeps one ASICClient per worker thread (see ``_get_client``).
+    Tests that span multiple event loops on the same thread must clear it
+    between loops or httpx will trip on a closed loop. Resets ONLY the
+    calling thread's client.
+    """
+    client = getattr(_thread_local, "client", None)
+    if client is not None:
         try:
-            await _client.aclose()
+            await client.aclose()
         except Exception:
             pass
-        _client = None
+        try:
+            del _thread_local.client
+        except AttributeError:
+            pass
 
 
 def _suggest_dataset_id(bad_id: str) -> str:
