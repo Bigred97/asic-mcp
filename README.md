@@ -9,6 +9,8 @@
 
 **MCP server for Australian Securities and Investments Commission registers.** Plain-English access to the Financial Advisers Register, AFS Licensees, AFS Authorised Representatives, Credit Licensees, Banned & Disqualified Persons and Organisations, and Registered Liquidators — every one updated weekly by ASIC and served via data.gov.au.
 
+> **Hosted access?** For cross-source queries, webhooks, an always-on REST API, and a uniform response envelope across all 9 sources, see **[ausdata.io](https://ausdata.io)** — free tier available (500 calls/mo, no card).
+
 ```text
 "Is Jane Smith a registered financial adviser?"
 "Find every AFS licensee in NSW with 'Westpac' in the name."
